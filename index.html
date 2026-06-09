@@ -146,6 +146,42 @@ html,body {
   from { opacity:0; transform:translateY(26px) scale(.97) }
   to   { opacity:1; transform:none }
 }
+/* Abas login / cadastro */
+.login-tabs {
+  display:flex; gap:0; margin-bottom:32px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.login-tab {
+  flex:1; padding:10px 4px; background:none; border:none;
+  color:var(--t3); font-size:13px; font-weight:500; cursor:pointer;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:color .2s, border-color .2s;
+}
+.login-tab.active {
+  color:var(--blue); border-bottom-color:var(--blue);
+}
+.login-tab:hover:not(.active) { color:var(--t2); }
+
+/* Painel de cadastro */
+#cad-panel { display:none; }
+#cad-panel.visible { display:block; }
+#login-panel { display:block; }
+#login-panel.hidden { display:none; }
+
+/* Mensagens do cadastro */
+.cad-success {
+  display:none; padding:11px 14px; border-radius:var(--r2);
+  background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.25);
+  color:#6ee7b7; font-size:12.5px; line-height:1.5; margin-bottom:14px;
+}
+.cad-success.visible { display:block; }
+.cad-err {
+  display:none; padding:11px 14px; border-radius:var(--r2);
+  background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.22);
+  color:#fca5a5; font-size:12.5px; line-height:1.5; margin-bottom:14px;
+}
+.cad-err.visible { display:block; }
+
 .brand { display:flex; align-items:center; gap:14px; margin-bottom:38px }
 .brand-logo {
   width:46px; height:46px; border-radius:14px; flex-shrink:0;
@@ -404,7 +440,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 
 /* ═══════════════════════════════════════════
    VIEWS
-═══════════════════════════════════════════ */
+════════════════════════��══════════════════ */
 .view { display:none; width:100%; box-sizing:border-box; padding:16px 20px 32px; touch-action:pan-y; }
 .view.on { display:block }
 
@@ -578,7 +614,7 @@ td {
 tr:hover td { background:rgba(59,130,246,.05) }
 tr:last-child td { border-bottom:none }
 
-/* ═══════════════════════════════════════════
+/* ═════════════════════════════════���═════════
    TABS
 ═══════════════════════════════════════════ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
@@ -1234,25 +1270,79 @@ select option {
         <p>Gestão de Vendas Premium</p>
       </div>
     </div>
-    <div id="login-err" class="alert err"></div>
-    <div class="field">
-      <label>E-mail</label>
-      <input id="lg-email" type="email" placeholder="seunome@empresa.com" autocomplete="email">
+
+    <!-- Abas — visíveis somente quando Supabase está ativo -->
+    <div class="login-tabs" id="login-tabs" style="display:none">
+      <button class="login-tab active" id="tab-entrar"   onclick="switchLoginTab('entrar')">Entrar</button>
+      <button class="login-tab"        id="tab-cadastro" onclick="switchLoginTab('cadastro')">Criar conta</button>
     </div>
-    <div class="field" style="margin-bottom:26px">
-      <label>Senha</label>
-      <div style="position:relative">
-        <input id="lg-pwd" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:44px">
-        <button type="button" id="toggle-pwd" onclick="togglePwd()" title="Mostrar/esconder senha" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:17px;line-height:1;padding:4px;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">👁️</button>
+
+    <!-- ── PAINEL DE LOGIN ─────────────────────────────────────── -->
+    <div id="login-panel">
+      <div id="login-err" class="alert err"></div>
+      <div class="field">
+        <label>E-mail</label>
+        <input id="lg-email" type="email" placeholder="seunome@empresa.com" autocomplete="email">
+      </div>
+      <div class="field" style="margin-bottom:26px">
+        <label>Senha</label>
+        <div style="position:relative">
+          <input id="lg-pwd" type="password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()" style="padding-right:44px">
+          <button type="button" id="toggle-pwd" onclick="togglePwd()" title="Mostrar/esconder senha" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:17px;line-height:1;padding:4px;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">👁️</button>
+        </div>
+      </div>
+      <button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);letter-spacing:.01em" onclick="doLogin()">
+        Entrar no sistema &nbsp;→
+      </button>
+      <div style="text-align:center;margin-top:22px;padding-top:18px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px">
+        <button onclick="fixAccess()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">Problemas para acessar?</button>
+        <button onclick="openResetPwd()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">🔑 Esqueci minha senha</button>
       </div>
     </div>
-    <button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);letter-spacing:.01em" onclick="doLogin()">
-      Entrar no sistema &nbsp;→
-    </button>
-    <div style="text-align:center;margin-top:22px;padding-top:18px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px">
-      <button onclick="fixAccess()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">Problemas para acessar?</button>
-      <button onclick="openResetPwd()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">🔑 Esqueci minha senha</button>
+
+    <!-- ── PAINEL DE CADASTRO ──────────────────────────────────── -->
+    <div id="cad-panel">
+      <div id="cad-err"     class="cad-err"></div>
+      <div id="cad-success" class="cad-success"></div>
+
+      <div class="field">
+        <label>Nome da empresa <span style="color:var(--red)">*</span></label>
+        <input id="cad-nome-empresa" type="text" placeholder="Ex: Distribuidora Central" autocomplete="organization" maxlength="120">
+      </div>
+      <div class="field">
+        <label>Seu nome completo <span style="color:var(--red)">*</span></label>
+        <input id="cad-nome-admin" type="text" placeholder="Ex: João da Silva" autocomplete="name" maxlength="120">
+      </div>
+      <div class="field">
+        <label>E-mail de acesso <span style="color:var(--red)">*</span></label>
+        <input id="cad-email" type="email" placeholder="voce@empresa.com" autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Senha <span style="color:var(--red)">*</span></label>
+        <div style="position:relative">
+          <input id="cad-pwd" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password" maxlength="64" style="padding-right:44px">
+          <button type="button" onclick="toggleCadPwd()" title="Mostrar senha" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--t3);font-size:17px;line-height:1;padding:4px;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">👁️</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Confirmar senha <span style="color:var(--red)">*</span></label>
+        <input id="cad-pwd2" type="password" placeholder="Repita a senha" autocomplete="new-password" maxlength="64" onkeydown="if(event.key==='Enter')doCadastroEmpresa()">
+      </div>
+      <div class="field" style="margin-bottom:22px">
+        <label style="color:var(--t3)">CNPJ <span style="font-size:11px;font-weight:400">(opcional)</span></label>
+        <input id="cad-cnpj" type="text" placeholder="00.000.000/0000-00" maxlength="18" oninput="maskCNPJ(this)">
+      </div>
+
+      <button class="btn btn-p" id="btn-cadastrar" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);letter-spacing:.01em" onclick="doCadastroEmpresa()">
+        Criar minha conta &nbsp;→
+      </button>
+
+      <p style="text-align:center;font-size:11px;color:var(--t3);margin-top:14px;line-height:1.5">
+        Ao criar uma conta você concorda com os termos de uso.<br>
+        Já tem acesso? <button onclick="switchLoginTab('entrar')" style="background:none;border:none;color:var(--blue);font-size:11px;cursor:pointer;padding:0">Faça login.</button>
+      </p>
     </div>
+
   </div>
 </div>
 
@@ -2454,6 +2544,163 @@ function togglePwd(){
   if(btn) btn.style.opacity=inp.type==='text'?'1':'0.5';
 }
 
+function toggleCadPwd(){
+  var inp=document.getElementById('cad-pwd');
+  if(!inp) return;
+  inp.type=inp.type==='password'?'text':'password';
+}
+
+// ── Máscara CNPJ ──────────────────────────────────────────────────
+function maskCNPJ(input){
+  var v=input.value.replace(/\D/g,'').substring(0,14);
+  if(v.length>12) v=v.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2}).*/,'$1.$2.$3/$4-$5');
+  else if(v.length>8) v=v.replace(/^(\d{2})(\d{3})(\d{3})(\d{0,4}).*/,'$1.$2.$3/$4');
+  else if(v.length>5) v=v.replace(/^(\d{2})(\d{3})(\d{0,3}).*/,'$1.$2.$3');
+  else if(v.length>2) v=v.replace(/^(\d{2})(\d{0,3}).*/,'$1.$2');
+  input.value=v;
+}
+
+// ── Alternância de abas: Entrar / Criar conta ─────────────────────
+function switchLoginTab(tab){
+  var loginPanel = document.getElementById('login-panel');
+  var cadPanel   = document.getElementById('cad-panel');
+  var tabEntrar  = document.getElementById('tab-entrar');
+  var tabCad     = document.getElementById('tab-cadastro');
+  if(!loginPanel || !cadPanel) return;
+
+  if(tab === 'cadastro'){
+    loginPanel.style.display = 'none';
+    cadPanel.style.display   = 'block';
+    tabEntrar.classList.remove('active');
+    tabCad.classList.add('active');
+    // Limpa mensagens anteriores
+    _cadClearMessages();
+  } else {
+    loginPanel.style.display = 'block';
+    cadPanel.style.display   = 'none';
+    tabEntrar.classList.add('active');
+    tabCad.classList.remove('active');
+  }
+}
+
+function _cadClearMessages(){
+  var err = document.getElementById('cad-err');
+  var ok  = document.getElementById('cad-success');
+  if(err){ err.textContent=''; err.className='cad-err'; }
+  if(ok) { ok.textContent='';  ok.className='cad-success'; }
+}
+
+function _cadShowErr(msg){
+  var el = document.getElementById('cad-err');
+  if(!el) return;
+  el.textContent = msg;
+  el.className   = 'cad-err visible';
+  var ok = document.getElementById('cad-success');
+  if(ok){ ok.textContent=''; ok.className='cad-success'; }
+}
+
+function _cadShowOk(msg){
+  var el = document.getElementById('cad-success');
+  if(!el) return;
+  el.textContent = msg;
+  el.className   = 'cad-success visible';
+  var err = document.getElementById('cad-err');
+  if(err){ err.textContent=''; err.className='cad-err'; }
+}
+
+// Erros da Edge Function → PT-BR
+var _cadErrorMap = {
+  'MISSING_FIELDS':      'Preencha todos os campos obrigatórios.',
+  'PASSWORD_TOO_SHORT':  'A senha deve ter no mínimo 6 caracteres.',
+  'INVALID_EMAIL':       'E-mail inválido.',
+  'EMAIL_EXISTS':        'Este e-mail já está cadastrado. Faça login ou use outro e-mail.',
+  'CNPJ_EXISTS':         'CNPJ já cadastrado no sistema.',
+  'EMPRESA_INSERT_ERROR':'Erro ao criar empresa. Tente novamente.',
+  'AUTH_CREATE_ERROR':   'Erro ao criar credenciais de acesso. Tente novamente.',
+  'USER_INSERT_ERROR':   'Erro ao criar perfil. Tente novamente.',
+  'MAP_INSERT_ERROR':    'Erro ao finalizar cadastro. Tente novamente.',
+  'METHOD_NOT_ALLOWED':  'Erro de configuração. Contate o suporte.',
+};
+
+// ── Cadastro de Empresa via Edge Function ─────────────────────────
+function doCadastroEmpresa(){
+  if(!CLOUD_ENABLED || !_sb){
+    _cadShowErr('Cadastro online indisponível no momento. Tente novamente.');
+    return;
+  }
+
+  var nomeEmpresa = (document.getElementById('cad-nome-empresa').value || '').trim();
+  var nomeAdmin   = (document.getElementById('cad-nome-admin').value   || '').trim();
+  var email       = (document.getElementById('cad-email').value        || '').trim().toLowerCase();
+  var pwd         = document.getElementById('cad-pwd').value  || '';
+  var pwd2        = document.getElementById('cad-pwd2').value || '';
+  var cnpj        = (document.getElementById('cad-cnpj').value || '').trim();
+
+  // Validações no cliente (segunda camada — a Edge Function valida novamente)
+  if(!nomeEmpresa){ _cadShowErr('Informe o nome da empresa.'); document.getElementById('cad-nome-empresa').focus(); return; }
+  if(!nomeAdmin)  { _cadShowErr('Informe seu nome completo.');  document.getElementById('cad-nome-admin').focus();   return; }
+  if(!email)      { _cadShowErr('Informe o e-mail de acesso.');  document.getElementById('cad-email').focus();       return; }
+  var emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if(!emailRx.test(email)){ _cadShowErr('E-mail inválido.'); document.getElementById('cad-email').focus(); return; }
+  if(pwd.length < 6){ _cadShowErr('A senha deve ter no mínimo 6 caracteres.'); document.getElementById('cad-pwd').focus(); return; }
+  if(pwd !== pwd2)  { _cadShowErr('As senhas não coincidem.'); document.getElementById('cad-pwd2').focus(); return; }
+
+  // Desabilita botão durante a requisição
+  var btn = document.getElementById('btn-cadastrar');
+  if(btn){ btn.disabled=true; btn.textContent='Criando conta...'; }
+  _cadClearMessages();
+
+  var body = { nome_empresa: nomeEmpresa, nome_admin: nomeAdmin, email_admin: email, senha_admin: pwd };
+  if(cnpj) body.cnpj = cnpj;
+
+  _sb.functions.invoke('criar-empresa', { body: body })
+    .then(function(result){
+      if(btn){ btn.disabled=false; btn.textContent='Criar minha conta \u00a0\u2192'; }
+
+      var data  = result.data;
+      var error = result.error;
+
+      // Erro de rede ou timeout
+      if(error){
+        _cadShowErr('Erro de conexão. Verifique sua internet e tente novamente.');
+        return;
+      }
+
+      // Erro retornado pela Edge Function
+      if(data && data.error){
+        var msg = _cadErrorMap[data.code] || data.error || 'Erro inesperado. Tente novamente.';
+        _cadShowErr(msg);
+        return;
+      }
+
+      // Sucesso — empresa e usuário criados
+      if(data && data.empresa_id){
+        _cadShowOk('Conta criada com sucesso! Fazendo login...');
+        // Aguarda 1.2s para o usuário ler a mensagem e faz login automático
+        setTimeout(function(){
+          document.getElementById('lg-email').value = email;
+          switchLoginTab('entrar');
+          // Preenche o email e dispara login automaticamente via Supabase
+          doLoginSupabase(email, pwd).then(function(ok){
+            if(!ok){
+              // Login automático falhou — pede para o usuário logar manualmente
+              _cadShowOk('Conta criada! Faça login para continuar.');
+              switchLoginTab('entrar');
+            }
+          });
+        }, 1200);
+        return;
+      }
+
+      _cadShowErr('Resposta inesperada do servidor. Tente novamente.');
+    })
+    .catch(function(e){
+      if(btn){ btn.disabled=false; btn.textContent='Criar minha conta \u00a0\u2192'; }
+      _cadShowErr('Erro de conexão. Verifique sua internet e tente novamente.');
+      console.error('[Fluxy/Cadastro] Erro inesperado:', e);
+    });
+}
+
 function openResetPwd(){
   // Show reset modal over login
   var existing=document.getElementById('reset-overlay');
@@ -3536,6 +3783,10 @@ function initSupabase() {
         console.log('[Fluxy/Supabase] Cliente inicializado.');
         _sbSetStatus('online');
 
+        // Revela as abas "Entrar / Criar conta" agora que Supabase está ativo
+        var tabs = document.getElementById('login-tabs');
+        if(tabs) tabs.style.display = 'flex';
+
         // Listener de estado de autenticação — renova sessão automaticamente
         _sb.auth.onAuthStateChange(function(event, session) {
           if (event === 'SIGNED_OUT') {
@@ -4091,7 +4342,7 @@ function stor_set_safe(key,val){
   }
 }
 
-// ── Role validation before any sensitive action ───────────────────────────
+// ── Role validation before any sensitive action ──────────��────────────────
 function requireAdm(){ if(!isAdm()){ toast('Sem permissão de administrador.','err'); return false; } return true; }
 function requireAdmOrGer(){ if(!isAdm()&&!isGer()){ toast('Sem permissão.','err'); return false; } return true; }
 function requireAuth(){ if(!SESS||!SESS.userId){ toast('Sessão expirada.','err'); go('dashboard'); return false; } return true; }
@@ -11096,7 +11347,7 @@ function rotaSetPos(pedId, newIdx){
 }
 
 
-// ════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════���
 // ROTAS — storage + helpers
 // ════════════════════════════════════════════════════════════════
 function getRotas(){ return stor_get(KEYS.rotas) || []; }
@@ -11656,7 +11907,7 @@ function renderRotas(){
       +'<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">'
         // Reorder + number column
         +'<div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0;width:44px">'
-          // Position input — tap to set exact position
+          // Position input �� tap to set exact position
           +'<input type="number" min="1" max="'+list.length+'" value="'+(i+1)+'"'
             +' data-id="'+p.id+'"'
             +' onchange="rotaSetPos(this.dataset.id,parseInt(this.value)-1)"'
