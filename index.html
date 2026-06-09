@@ -24,6 +24,9 @@
 
 <!-- Manifest -->
 <link rel="manifest" href="./manifest.json">
+
+<!-- Supabase JS SDK v2 (loaded async — app boots via initSupabase()) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" async id="supabase-sdk"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
@@ -414,7 +417,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═══════════════════════════════════════════
+/* ═════════════���═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -782,7 +785,7 @@ tr:last-child td { border-bottom:none }
 }
 
 
-/* ═══════════════════════════════════════════
+/* ════���══════════════════════════════════════
    PERFORMANCE
 ═══════════════════════════════════════════ */
 /* GPU compositing layer for scroll container */
@@ -1135,7 +1138,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ───────────────────────────── */
+/* ── General mobile responsiveness ───────────────────────────���─ */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -1296,7 +1299,11 @@ select option {
         <div class="sb-user-name" id="sb-nome">—</div>
         <div class="sb-user-role" id="sb-role">—</div>
       </div>
-      <button class="logout-btn" onclick="doLogout()" title="Sair">⏻</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <!-- Indicador de conexão com a nuvem -->
+        <span id="sb-cloud-dot" title="Status da nuvem" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6B7280;transition:background .4s;flex-shrink:0"></span>
+        <button class="logout-btn" onclick="doLogout()" title="Sair">⏻</button>
+      </div>
     </div>
   </div>
 
@@ -2575,6 +2582,14 @@ function doLogin(){
   var err=document.getElementById('login-err');
   if(err) err.style.display='none';
   if(!email||!pwd){showErr('Preencha e-mail e senha.');return;}
+
+  // ── Caminho Supabase (quando integração ativa) ────────────────────
+  if(CLOUD_ENABLED && CLOUD_PROVIDER==='supabase' && _sb) {
+    doLoginSupabase(email, pwd);
+    return;
+  }
+
+  // ── Caminho local (localStorage) ─────────────────────────────────
   var users=getUsers();
   // Find user by email first (case-insensitive)
   var candidate=null;
@@ -2616,6 +2631,10 @@ function showErr(msg){
 }
 
 function doLogout(){
+  // Supabase signOut (fire-and-forget — não bloqueia a UI)
+  if(CLOUD_ENABLED && _sb) {
+    doLogoutSupabase();
+  }
   SESS = null;
   APP_STATE.session=null;
   APP_STATE.set('auth.logged',false);
@@ -2625,6 +2644,7 @@ function doLogout(){
   document.getElementById('app').className = '';
   document.getElementById('login-wrap').style.display = 'flex';
   document.getElementById('lg-pwd').value = '';
+  _sbSetStatus('offline');
 }
 
 function fixAccess(){
@@ -2636,9 +2656,37 @@ function fixAccess(){
 }
 
 function loadSession(){
+  // ── Caminho Supabase: tenta restaurar sessão ativa ────────────────
+  if(CLOUD_ENABLED && _sb) {
+    loadSessionSupabase().then(function(restored) {
+      if(!restored) {
+        _loadSessionLocal();
+        if(SESS) { showApp(); } else { document.getElementById('login-wrap').style.display='flex'; }
+      }
+      // Se restored=true, showApp() já foi chamado dentro de loadSessionSupabase()
+    }).catch(function() {
+      _loadSessionLocal();
+      if(SESS) { showApp(); } else { document.getElementById('login-wrap').style.display='flex'; }
+    });
+    return;
+  }
+
+  // ── Fallback local ────────────────────────────────────────────────
+  _loadSessionLocal();
+}
+
+function _loadSessionLocal(){
   var s = stor_get(KEYS.sess);
   console.log('[SESSION]', s && s.userId ? 'RESTAURADA ('+s.role+')' : 'NAO_ENCONTRADA');
-  if(s && s.userId && s.role){ if(!s.empresaId) s.empresaId='default'; if(!s.plano) s.plano='basico'; SESS = s; APP_STATE.session=s; APP_STATE.set('auth.logged',true); APP_STATE.set('auth.role',s.role); APP_STATE.set('auth.user',s.nome); }
+  if(s && s.userId && s.role){
+    if(!s.empresaId) s.empresaId='default';
+    if(!s.plano) s.plano='basico';
+    SESS = s;
+    APP_STATE.session=s;
+    APP_STATE.set('auth.logged',true);
+    APP_STATE.set('auth.role',s.role);
+    APP_STATE.set('auth.user',s.nome);
+  }
 }
 
 function isAdm(){
@@ -3417,39 +3465,316 @@ function renderRanking(){
   el.innerHTML=html;
 }
 
-// ── CLOUD SYNC ARCHITECTURE STUB ─────────────────────────────────────
-// Prepared for Firebase or Supabase integration.
-// All localStorage operations go through stor_get/stor_set.
-// To enable cloud sync: implement syncCloud() below and call it after each stor_set.
-var CLOUD_ENABLED = false;
-var CLOUD_PROVIDER = 'none'; // 'firebase' | 'supabase' | 'none'
+// ── SUPABASE INTEGRATION ─────────────────────────────────────────────
+// Etapa 1: SDK + Login
+// A anon key é pública por design — é o token de acesso do cliente.
+// A service_role key NUNCA é exposta aqui.
+// ─────────────────────────────────────────────────────────────────────
+var CLOUD_ENABLED  = false;
+var CLOUD_PROVIDER = 'none'; // 'supabase' | 'none'
+var _sb = null; // supabase client instance
 
-function syncCloud(key, data){
-  if(!CLOUD_ENABLED||CLOUD_PROVIDER==='none') return;
-  // ── Firebase example ──────────────────────────────────────────────
-  // if(CLOUD_PROVIDER==='firebase' && typeof firebase !== 'undefined'){
-  //   firebase.database().ref('fluxy/'+SESS.userId+'/'+key).set(data);
-  // }
-  // ── Supabase example ─────────────────────────────────────────────
-  // if(CLOUD_PROVIDER==='supabase' && typeof supabase !== 'undefined'){
-  //   supabase.from('fluxy_data').upsert({userId:SESS.userId, key:key, data:JSON.stringify(data)});
-  // }
+var SUPABASE_URL      = 'https://eyyttblikwpdislznuia.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eXR0Ymxpa3dwZGlzbHpudWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjQ1MDAsImV4cCI6MjA5NjU0MDUwMH0.8i2JiV7IueZn_tw7xfFkl1nyLTHT1Wpa9bN5x7mT07o';
+
+// Erros Supabase Auth → PT-BR
+var _sbAuthErrors = {
+  'Invalid login credentials':         'E-mail ou senha incorretos.',
+  'Email not confirmed':                'E-mail não confirmado. Verifique sua caixa de entrada.',
+  'User not found':                     'Usuário não encontrado.',
+  'Too many requests':                  'Muitas tentativas. Aguarde alguns minutos.',
+  'Email rate limit exceeded':          'Limite de e-mails atingido. Tente mais tarde.',
+  'Password should be at least 6 characters': 'A senha deve ter no mínimo 6 caracteres.',
+  'Unable to validate email address':   'E-mail inválido.',
+  'Network request failed':             'Sem conexão. Verifique sua internet.',
+  'JWT expired':                        'Sessão expirada. Faça login novamente.',
+  'Invalid Refresh Token':              'Sessão inválida. Faça login novamente.',
+  'Refresh Token Not Found':            'Sessão não encontrada. Faça login novamente.'
+};
+
+function _sbTranslateError(msg) {
+  if (!msg) return 'Erro desconhecido. Tente novamente.';
+  var keys = Object.keys(_sbAuthErrors);
+  for (var i = 0; i < keys.length; i++) {
+    if (msg.indexOf(keys[i]) !== -1) return _sbAuthErrors[keys[i]];
+  }
+  return msg;
 }
 
-function enableCloudSync(provider, config){
-  CLOUD_PROVIDER=provider||'none';
-  CLOUD_ENABLED=!!provider&&provider!=='none';
-  if(config&&config.apiKey&&provider==='firebase'){
-    // firebase.initializeApp(config);
-    console.log('[Fluxy] Firebase ready (SDK not loaded — add <script src=firebase.js> to index.html)');
-  }
-  if(config&&config.url&&provider==='supabase'){
-    // window.supabase = supabase.createClient(config.url, config.key);
-    console.log('[Fluxy] Supabase ready (SDK not loaded — add <script src=supabase.js> to index.html)');
-  }
-  toast(CLOUD_ENABLED?'☁️ Cloud sync ativado ('+provider+')':'Cloud sync desativado');
+// ── Indicador de status da conexão Supabase ───────────────────────
+function _sbSetStatus(status) {
+  // status: 'online' | 'offline' | 'syncing' | 'error'
+  var dot = document.getElementById('sb-cloud-dot');
+  if (!dot) return;
+  var colors = { online: '#10B981', offline: '#6B7280', syncing: '#F59E0B', error: '#EF4444' };
+  var titles = { online: 'Nuvem conectada', offline: 'Modo offline', syncing: 'Sincronizando...', error: 'Erro de conexão' };
+  dot.style.background = colors[status] || colors.offline;
+  dot.title = titles[status] || '';
 }
-// ── END CLOUD STUB ────────────────────────────────────────────────────
+
+// ── Inicialização do Supabase ──────────────────────────────────────
+// Chamada no boot. Aguarda o SDK carregar (máx 8s) antes de ativar.
+function initSupabase() {
+  var sdk = document.getElementById('supabase-sdk');
+  var maxWait = 8000;
+  var interval = 100;
+  var elapsed = 0;
+
+  function tryInit() {
+    if (typeof window.supabase !== 'undefined' && window.supabase.createClient) {
+      try {
+        _sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          auth: {
+            persistSession: true,
+            autoRefreshToken: true,
+            detectSessionInUrl: false,
+            storageKey: 'fz_sb_sess'
+          }
+        });
+        CLOUD_PROVIDER = 'supabase';
+        CLOUD_ENABLED  = true;
+        console.log('[Fluxy/Supabase] Cliente inicializado.');
+        _sbSetStatus('online');
+
+        // Listener de estado de autenticação — renova sessão automaticamente
+        _sb.auth.onAuthStateChange(function(event, session) {
+          if (event === 'SIGNED_OUT') {
+            if (SESS) {
+              // Supabase fez logout externo (ex: token revogado)
+              SESS = null;
+              APP_STATE.session = null;
+              stor_set(KEYS.sess, null);
+              document.getElementById('app').className = '';
+              document.getElementById('login-wrap').style.display = 'flex';
+              showErr('Sua sessão foi encerrada. Faça login novamente.');
+            }
+          } else if (event === 'TOKEN_REFRESHED') {
+            console.log('[Fluxy/Supabase] Token renovado automaticamente.');
+          }
+        });
+
+      } catch(e) {
+        console.error('[Fluxy/Supabase] Erro ao inicializar cliente:', e);
+        CLOUD_ENABLED = false;
+        _sbSetStatus('error');
+      }
+    } else {
+      elapsed += interval;
+      if (elapsed < maxWait) {
+        setTimeout(tryInit, interval);
+      } else {
+        // SDK não carregou a tempo — app continua em modo local
+        console.warn('[Fluxy/Supabase] SDK não carregou em ' + maxWait + 'ms. Modo local ativado.');
+        CLOUD_ENABLED = false;
+        CLOUD_PROVIDER = 'none';
+        _sbSetStatus('offline');
+      }
+    }
+  }
+
+  // Se o script já carregou de forma síncrona, tryInit resolve imediatamente
+  tryInit();
+}
+
+// ── LOGIN via Supabase Auth ────────────────────────────────────────
+// Cria sessão Supabase e busca perfil do usuário em public.usuarios.
+// Retorna true em caso de sucesso, false em caso de falha.
+function doLoginSupabase(email, pwd) {
+  if (!_sb) { return Promise.resolve(false); }
+
+  _sbSetStatus('syncing');
+
+  return _sb.auth.signInWithPassword({ email: email, password: pwd })
+    .then(function(result) {
+      var error = result.error;
+      var data  = result.data;
+
+      if (error) {
+        _sbSetStatus('online');
+        showErr(_sbTranslateError(error.message));
+        recordFailedLogin();
+        return false;
+      }
+
+      var authUser = data && data.user;
+      if (!authUser) {
+        _sbSetStatus('online');
+        showErr('Erro ao obter dados do usuário. Tente novamente.');
+        recordFailedLogin();
+        return false;
+      }
+
+      // Busca perfil completo via usuarios_auth_map + usuarios
+      return _sb
+        .from('usuarios_auth_map')
+        .select('usuario_id')
+        .eq('auth_uid', authUser.id)
+        .maybeSingle()
+        .then(function(mapResult) {
+          if (mapResult.error || !mapResult.data) {
+            // Usuário autenticado no Supabase mas sem perfil local mapeado
+            console.warn('[Fluxy/Supabase] Auth OK mas sem mapeamento em usuarios_auth_map. auth_uid:', authUser.id);
+            _sbSetStatus('error');
+            showErr('Usuário autenticado, mas sem perfil no sistema. Contate o administrador.');
+            _sb.auth.signOut();
+            return false;
+          }
+
+          var usuarioId = mapResult.data.usuario_id;
+
+          return _sb
+            .from('usuarios')
+            .select('id, nome, email, role, empresa_id, status, ativo, plano')
+            .eq('id', usuarioId)
+            .maybeSingle()
+            .then(function(userResult) {
+              if (userResult.error || !userResult.data) {
+                _sbSetStatus('error');
+                showErr('Perfil do usuário não encontrado. Contate o administrador.');
+                _sb.auth.signOut();
+                return false;
+              }
+
+              var u = userResult.data;
+
+              if (u.status === 'desligado') {
+                showErr('Seu acesso foi removido do sistema.');
+                _sb.auth.signOut();
+                return false;
+              }
+              if (u.ativo === false || u.status === 'bloqueado') {
+                showErr('Seu acesso está bloqueado. Entre em contato com o administrador.');
+                _sb.auth.signOut();
+                return false;
+              }
+
+              resetLoginAttempts();
+              _sbSetStatus('online');
+
+              SESS = {
+                userId:    u.id,
+                nome:      u.nome,
+                email:     u.email,
+                role:      u.role || 'vend',
+                empresaId: u.empresa_id || 'default',
+                plano:     u.plano || 'basico',
+                sbAuthId:  authUser.id  // referência ao auth.users para uso interno
+              };
+              APP_STATE.session = SESS;
+              APP_STATE.set('auth.logged', true);
+              APP_STATE.set('auth.role',   SESS.role);
+              APP_STATE.set('auth.user',   SESS.nome);
+              stor_set(KEYS.sess, SESS);
+              showApp();
+              return true;
+            });
+        });
+    })
+    .catch(function(e) {
+      console.error('[Fluxy/Supabase] doLoginSupabase error:', e);
+      _sbSetStatus('error');
+      showErr('Erro de conexão. Verifique sua internet e tente novamente.');
+      return false;
+    });
+}
+
+// ── LOGOUT via Supabase ────────────────────────────────────────────
+function doLogoutSupabase() {
+  if (!_sb) return Promise.resolve();
+  return _sb.auth.signOut().catch(function(e) {
+    console.warn('[Fluxy/Supabase] signOut error (ignorado):', e);
+  });
+}
+
+// ── RESTORE SESSION via Supabase ───────────────────────────────────
+// Tenta restaurar sessão ativa do Supabase. Se inválida, cai no
+// fallback local (fz_sess no localStorage).
+// Retorna Promise<boolean> — true se sessão Supabase foi restaurada.
+function loadSessionSupabase() {
+  if (!_sb) return Promise.resolve(false);
+
+  return _sb.auth.getSession().then(function(result) {
+    var sbSess = result.data && result.data.session;
+    if (!sbSess || !sbSess.user) {
+      console.log('[Fluxy/Supabase] Nenhuma sessão ativa no Supabase.');
+      return false;
+    }
+
+    // Sessão Supabase existe — busca o perfil
+    return _sb
+      .from('usuarios_auth_map')
+      .select('usuario_id')
+      .eq('auth_uid', sbSess.user.id)
+      .maybeSingle()
+      .then(function(mapResult) {
+        if (mapResult.error || !mapResult.data) return false;
+        return _sb
+          .from('usuarios')
+          .select('id, nome, email, role, empresa_id, status, ativo, plano')
+          .eq('id', mapResult.data.usuario_id)
+          .maybeSingle();
+      })
+      .then(function(userResult) {
+        if (!userResult || userResult.error || !userResult.data) return false;
+        var u = userResult.data;
+        if (u.ativo === false || u.status === 'desligado' || u.status === 'bloqueado') return false;
+
+        SESS = {
+          userId:    u.id,
+          nome:      u.nome,
+          email:     u.email,
+          role:      u.role || 'vend',
+          empresaId: u.empresa_id || 'default',
+          plano:     u.plano || 'basico',
+          sbAuthId:  sbSess.user.id
+        };
+        APP_STATE.session = SESS;
+        APP_STATE.set('auth.logged', true);
+        APP_STATE.set('auth.role',   SESS.role);
+        APP_STATE.set('auth.user',   SESS.nome);
+        stor_set(KEYS.sess, SESS);
+        _sbSetStatus('online');
+        console.log('[Fluxy/Supabase] Sessão restaurada:', SESS.nome, '(' + SESS.role + ')');
+        return true;
+      })
+      .catch(function(e) {
+        console.warn('[Fluxy/Supabase] Erro ao restaurar perfil:', e);
+        return false;
+      });
+  }).catch(function(e) {
+    console.warn('[Fluxy/Supabase] Erro ao obter sessão:', e);
+    return false;
+  });
+}
+
+// ── RESET DE SENHA via Supabase ────────────────────────────────────
+// Chamado quando CLOUD_ENABLED=true no lugar do reset local.
+function doResetPasswordSupabase(email) {
+  if (!_sb || !email) return;
+  _sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/?reset=1'
+  }).then(function(result) {
+    if (result.error) {
+      showResetMsg('Erro: ' + _sbTranslateError(result.error.message), 'err');
+    } else {
+      showResetMsg('E-mail de recuperação enviado para ' + email + '. Verifique sua caixa de entrada.', 'ok');
+    }
+  }).catch(function() {
+    showResetMsg('Erro de conexão. Verifique sua internet.', 'err');
+  });
+}
+
+// Legacy stub — mantido para compatibilidade com qualquer chamada existente
+function syncCloud(key, data) {
+  if (!CLOUD_ENABLED || CLOUD_PROVIDER === 'none') return;
+  // Sync por entidade será implementado na Etapa 3 (clientes) em diante.
+}
+
+function enableCloudSync(provider, config) {
+  // Mantido para compatibilidade — o setup real é feito por initSupabase()
+  console.log('[Fluxy] enableCloudSync() chamado com provider:', provider, '— use initSupabase() para setup real.');
+}
+// ── END SUPABASE INTEGRATION ──────────────────────────────────────
 
 function sendCobrancaWA(cobrId){
   var cobrs=getCobr()||[]; var cobr=null;
@@ -5814,7 +6139,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
             var lb=document.createElement('span');
             lb.className='lock-badge';
             lb.style.cssText='font-size:11px;color:var(--t3);padding:4px 8px;background:var(--s2);border-radius:6px;border:1px solid var(--b1)';
-            lb.textContent='🔒 Prazo expirado';
+            lb.textContent='�� Prazo expirado';
             // Insert after Ver button
             bwEl.insertBefore(lb,bwEl.children[1]||null);
           }
@@ -12012,15 +12337,27 @@ function seed(){
 // ═══════════════════════════════════════════════════════════
 var APP_VERSION = '2.1';
 console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().slice(0,10));
-seedAdmin();
-seed();
-loadSession();
 
-if(SESS){
-  showApp();
-} else {
-  document.getElementById('login-wrap').style.display = 'flex';
-}
+// Inicia o Supabase (async — SDK carregado via <script async>)
+// loadSession() será chamado após initSupabase() confirmar status
+initSupabase();
+
+// Pequena janela para o SDK Supabase carregar antes de tentar restaurar sessão.
+// Se o SDK não carregar em 800ms, o fallback local assume imediatamente.
+setTimeout(function() {
+  seedAdmin();
+  seed();
+  loadSession();
+
+  // loadSession() com Supabase chama showApp() de dentro da Promise.
+  // loadSession() local (fallback) é síncrono — showApp() precisa ser chamado aqui.
+  if(!CLOUD_ENABLED && SESS) {
+    showApp();
+  } else if(!CLOUD_ENABLED) {
+    document.getElementById('login-wrap').style.display = 'flex';
+  }
+  // Se CLOUD_ENABLED=true, loadSession() gerencia o showApp() / login-wrap internamente.
+}, 800);
 
 
 // ═══════════════════════════════════════════════════════════════
