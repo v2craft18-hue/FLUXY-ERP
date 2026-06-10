@@ -405,7 +405,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 .view { display:none; width:100%; box-sizing:border-box; padding:16px 20px 32px; touch-action:pan-y; }
 .view.on { display:block }
 
-/* ═══════════════════════════════════════════
+/* ════���══════════════════════════════════════
    PAGE HEADER
 ═══════════════════════════════════════════ */
 .page-title {
@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════���������������═════════════════════════════
+/* ═════════════�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -1941,13 +1941,28 @@ if(typeof APP_STATE==='undefined'){
     cache:{},views:{},
     migration_state: { clis: false, prods: false, peds: false, cobr: false, rotas: false, usuarios: false },
     migration_report: { total: 0, migrada: 0, ignorada: 0, atualizada: 0, erro: 0, detalhes: [] },
+    offline: {
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      lastCheck: null,
+      checkInterval: 45000,
+      lastError: null,
+      lastSyncTime: null,
+      maxRetries: 5,
+      retryBackoff: [1000, 2000, 5000, 10000, 30000]
+    },
+    queue: {
+      pending: [],
+      failed: [],
+      maxSize: 1000
+    },
+    conflicts: [],
     get:function(p,d){try{return p.split('.').reduce(function(o,k){return o==null?undefined:o[k];},window.APP_STATE)||(d===undefined?undefined:d);}catch(e){return d===undefined?undefined:d;}},
     set:function(p,v){try{var a=p.split('.');var o=window.APP_STATE;for(var i=0;i<a.length-1;i++){if(o[a[i]]==null||typeof o[a[i]]!=='object')o[a[i]]={};o=o[a[i]];}o[a[a.length-1]]=v;}catch(e){}}
   };
 }
 
 
-// ════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════��════
 // CENTRAL APP STATE
 // ════════════════════════════════════════════════════════════════
 var APP_STATE=(function(){
@@ -2789,13 +2804,21 @@ async function loadClisFromSb(){
 }
 
 async function _cliUpsertSb(cliObj){
-  // Insert ou update de 1 cliente no Supabase (async, sem bloquear UI)
+  // Insert ou update de 1 cliente no Supabase (Etapa 10: com detecção online e fila)
   if(!CLOUD_ENABLED || !_sb || !SESS) return null;
+  
   var sbObj = _cliToSb(cliObj);
   if(!sbObj) return null;
   
+  // Se offline → enfileirar com deduplicação
+  var isOnline=await isCloudAvailable();
+  if(!isOnline){
+    console.log('[Fluxy/CLI] Offline — enfileirando cliente',cliObj.id);
+    _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
+    return null;
+  }
+  
   try {
-    // Se tem ID, é update; senão, é insert (Supabase faz upsert via ON CONFLICT)
     var { data, error } = cliObj.id && cliObj.id.length > 20
       ? await _sb
           .from('clientes')
@@ -2812,12 +2835,16 @@ async function _cliUpsertSb(cliObj){
     
     if(error) {
       console.error('[Fluxy/CLI] Erro ao upsert cliente:', error.message);
+      // Enfileirar em caso de erro
+      _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
       return null;
     }
     console.log('[Fluxy/CLI] Cliente '+cliObj.id+' salvo no Supabase');
     return data ? _cliFromSb(data) : null;
   } catch(e) {
     console.error('[Fluxy/CLI] Erro inesperado em _cliUpsertSb:', e.message);
+    // Enfileirar em caso de erro
+    _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
     return null;
   }
 }
@@ -11161,7 +11188,7 @@ function clearHist(){
 
 // ═══════════════════════════════════════════════════════════
 // USUÁRIOS
-// ════════════════════════════════════════��══════════════════
+// ════════════════════════════════════════��═════���════════════
 var usrTab='all';
 
 function setUsrTab(t){
@@ -11552,7 +11579,7 @@ function rotaSetPos(pedId, newIdx){
 }
 
 
-// ════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════���══════════════════════
 // ROTAS — storage + helpers
 // ════════════════════════════════════════════════════════════════
 // ── Supabase: Synchronization for Rotas (Etapa 7A) ───────────────
@@ -11767,6 +11794,213 @@ async function _migrateModulo(key, table, name, converter){
     logHist('Migração', '⚠️ Erro ao migrar '+name+': '+e.message, 'warning');
     // NÃO marcar como migrado em caso de erro — retry na próxima
   }
+}
+
+// ── Supabase: Offline e Fila de Sincronização (Etapa 10) ──────────
+
+// Verificar disponibilidade Supabase com cache (45s)
+async function isCloudAvailable(forceCheck){
+  var now=Date.now();
+  
+  // Se check recente → usar cache
+  if(!forceCheck && 
+     APP_STATE.offline.lastCheck && 
+     (now-APP_STATE.offline.lastCheck)<APP_STATE.offline.checkInterval){
+    return APP_STATE.offline.isOnline;
+  }
+  
+  // Check imediato se sem internet
+  if(!navigator.onLine){
+    APP_STATE.offline.isOnline=false;
+    return false;
+  }
+  
+  try{
+    var {error}=await _sb
+      .from('empresas')
+      .select('id',{count:'exact'})
+      .limit(1)
+      .timeout(3000);
+    
+    APP_STATE.offline.isOnline=!error;
+    APP_STATE.offline.lastCheck=now;
+    return !error;
+  }catch(e){
+    APP_STATE.offline.isOnline=false;
+    APP_STATE.offline.lastCheck=now;
+    return false;
+  }
+}
+
+// Enfileirar operação com deduplicação
+function _enqueueOperationDedup(modulo,op,data){
+  // Verificar se operação idêntica já está pendente
+  var existing=APP_STATE.queue.pending.find(function(item){
+    return item.modulo===modulo && item.op===op && item.data.id===data.id;
+  });
+  
+  if(existing){
+    if(op==='insert'){
+      // INSERT duplicado → ignorar
+      console.log('[Fluxy/Queue] Deduplicando INSERT:',modulo,data.id);
+      return;
+    }else if(op==='update'||op==='delete'){
+      // UPDATE/DELETE duplicado → substituir
+      var idx=APP_STATE.queue.pending.indexOf(existing);
+      APP_STATE.queue.pending[idx]={
+        id:'OP-'+Date.now()+'-'+Math.random(),
+        modulo:modulo,
+        op:op,
+        data:data,
+        attempts:0,
+        ts:Date.now()
+      };
+      console.log('[Fluxy/Queue] Operação atualizada:',modulo,op,data.id,'(fila:',APP_STATE.queue.pending.length+')');
+      stor_set('fz_queue_pending',APP_STATE.queue.pending);
+      return;
+    }
+  }
+  
+  // Adicionar nova operação
+  if(APP_STATE.queue.pending.length>=APP_STATE.queue.maxSize){
+    console.warn('[Fluxy/Queue] Fila cheia!',APP_STATE.queue.maxSize);
+    logHist('Sistema','⚠️ Fila offline está cheia — algumas operações podem ser perdidas');
+    return;
+  }
+  
+  var operation={
+    id:'OP-'+Date.now()+'-'+Math.random(),
+    modulo:modulo,
+    op:op,
+    data:data,
+    attempts:0,
+    ts:Date.now()
+  };
+  
+  APP_STATE.queue.pending.push(operation);
+  stor_set('fz_queue_pending',APP_STATE.queue.pending);
+  console.log('[Fluxy/Queue] Operação enfileirada:',modulo,op,data.id,'(fila:',APP_STATE.queue.pending.length+')');
+}
+
+// Detectar e registrar conflitos (sem resolver automaticamente)
+function _detectAndRegisterConflict(modulo,local,remote){
+  if(JSON.stringify(local)===JSON.stringify(remote)){
+    return false;  // Sem conflito
+  }
+  
+  // Conflito detectado — registrar
+  APP_STATE.conflicts.push({
+    id:'CONFLICT-'+Date.now()+'-'+Math.random(),
+    modulo:modulo,
+    recordId:local.id,
+    local:local,
+    remote:remote,
+    detectedAt:Date.now(),
+    resolvedAt:null,
+    resolution:null
+  });
+  
+  stor_set('fz_conflicts',APP_STATE.conflicts);
+  console.log('[Fluxy/Conflict] Conflito registrado:',modulo+'/'+local.id);
+  logHist('Sistema','⚠️ Conflito detectado em '+modulo+'/'+local.id+' — pendente resolução manual');
+  return true;
+}
+
+// Processar fila com retry e backoff
+async function _flushQueue(){
+  if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  
+  var pending=stor_get('fz_queue_pending')||[];
+  if(pending.length===0) return;
+  
+  console.log('[Fluxy/Flush] Processando',pending.length,'operações da fila...');
+  
+  var synced=[];
+  var failed=[];
+  
+  for(var i=0;i<pending.length;i++){
+    var op=pending[i];
+    var success=false;
+    
+    for(var retry=0;retry<APP_STATE.offline.maxRetries;retry++){
+      try{
+        // Executar operação baseado em tipo
+        var table=op.modulo==='clis'?'clientes':
+                 op.modulo==='prods'?'produtos':
+                 op.modulo==='peds'?'pedidos':
+                 op.modulo==='cobr'?'cobracas':
+                 op.modulo==='rotas'?'rotas':
+                 op.modulo==='usuarios'?'usuarios':'';
+        
+        if(!table) throw new Error('Tabela desconhecida:'+op.modulo);
+        
+        if(op.op==='delete'){
+          var {error}=await _sb.from(table).delete().eq('id',op.data.id);
+          if(error) throw error;
+        }else{
+          var {error}=await _sb.from(table).upsert([op.data],{onConflict:'id,empresa_id'});
+          if(error) throw error;
+        }
+        
+        synced.push(op);
+        success=true;
+        break;
+        
+      }catch(e){
+        op.attempts++;
+        op.lastError=e.message;
+        
+        if(retry<APP_STATE.offline.maxRetries-1){
+          var delay=APP_STATE.offline.retryBackoff[retry];
+          await new Promise(function(r){setTimeout(r,delay);});
+        }
+      }
+    }
+    
+    if(!success){
+      failed.push(op);
+    }
+  }
+  
+  APP_STATE.queue.pending=failed;
+  stor_set('fz_queue_pending',failed);
+  APP_STATE.offline.lastSyncTime=Date.now();
+  
+  console.log('[Fluxy/Flush] Sincronização completa:',synced.length,'OK,',failed.length,'com erro');
+  if(synced.length>0) logHist('Sistema','✅ '+synced.length+' operações sincronizadas da fila');
+  if(failed.length>0) logHist('Sistema','⚠️ '+failed.length+' operações com erro na fila');
+}
+
+// Setup listeners offline
+function _setupOfflineListeners(){
+  window.addEventListener('online',function(){
+    APP_STATE.offline.isOnline=true;
+    console.log('[Fluxy] Conexão restaurada');
+    toast('Conexão restaurada — sincronizando...','info');
+    _flushQueue().catch(function(e){console.error('[Fluxy/Flush] Erro:',e.message);});
+  });
+  
+  window.addEventListener('offline',function(){
+    APP_STATE.offline.isOnline=false;
+    console.log('[Fluxy] Modo offline ativado');
+    toast('Modo offline — alterações serão sincronizadas','warning');
+  });
+  
+  // Heartbeat a cada 45s
+  setInterval(function(){
+    if(!CLOUD_ENABLED||!_sb) return;
+    isCloudAvailable(true).catch(function(){});
+  },APP_STATE.offline.checkInterval);
+}
+
+function getQueueStatus(){
+  return {
+    pending:APP_STATE.queue.pending.length,
+    failed:APP_STATE.queue.failed.length,
+    conflicts:APP_STATE.conflicts.length,
+    isOnline:APP_STATE.offline.isOnline,
+    lastSync:APP_STATE.offline.lastSyncTime
+  };
 }
 
 function getRotas(){ return stor_get(KEYS.rotas) || []; }
@@ -12059,7 +12293,7 @@ function printRotaPDF(rotaId){
   if(w){ w.document.write(html); w.document.close(); setTimeout(function(){w.print();},500); }
 }
 
-// ── openGoogleMaps — open route in Maps ─────────────────────────
+// ── openGoogleMaps — open route in Maps ────────���────────────────
 function openRotaMaps(rotaId){
   var rota=getRotaById(rotaId);
   if(!rota){ toast('Rota não encontrada.','err'); return; }
@@ -13042,6 +13276,15 @@ if(SESS){
     syncCloud('usuarios');
     // Migração automática de dados locais para Supabase (Etapa 9)
     migrateDataToSb().catch(function(e){ console.error('[Fluxy/MIG] Erro na migração:', e.message); });
+    // Setup offline listeners (Etapa 10)
+    _setupOfflineListeners();
+    // Carregar fila pendente do boot anterior
+    var pendingQueue=stor_get('fz_queue_pending')||[];
+    if(pendingQueue.length>0){
+      console.log('[Fluxy/Queue] Fila carregada com',pendingQueue.length,'operações pendentes');
+      APP_STATE.queue.pending=pendingQueue;
+      _flushQueue().catch(function(e){console.error('[Fluxy/Flush] Erro ao processar fila:',e.message);});
+    }
   }
   showApp();
 } else {
@@ -13423,7 +13666,7 @@ if(history.state===null){ history.pushState({v:'dashboard'},'',''); }
 // ════════════════════════════════════════════════════════════════
 // FLUXI_DEBUG — runtime observability
 // Usage: window.FLUXI_DEBUG = true  (in DevTools console)
-// ════════════════════════════════════════════════════════════════
+// ═════��══════════════════════════════════════════════════════════
 window.FLUXI_DEBUG = false;
 
 function _flog(category, msg, data){
