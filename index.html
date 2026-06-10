@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════�����������═════════════════════════════
+/* ═════════════�������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -1135,7 +1135,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ─────────────���─────────���───── */
+/* ── General mobile responsiveness ───────────���─���─────────���───── */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -2242,7 +2242,7 @@ function getCobr(includeDeleted){
 }
 function saveCobr(v){ stor_set(KEYS.cobr,v); }
 
-// ═══════════════���════════════════════════════════════════════════
+// ═══════════���═══���════════════════════════════════════════════════
 // SAAS — multi-empresa storage + helpers
 // ════════════════════════════════════════════════════════════════
 function getEmpresaId(){ return (SESS&&SESS.empresaId)||'default'; }
@@ -2309,6 +2309,122 @@ function chamadoPrioLabel(pr){
 }
 function getEmpresa(){ return stor_get(KEYS.empresa)||{}; }
 function saveEmpresa(v){ stor_set(KEYS.empresa,v); }
+
+// ── Supabase: Synchronization for Usuários (Etapa 8A) ───────────────
+// Todas as operações respeitam empresa_id (RLS) e possuem fallback local
+
+function _usuarioToSb(userObj){
+  // Converte usuário local (camelCase) → Supabase (snake_case + empresa_id)
+  if(!userObj || !SESS) return null;
+  return {
+    empresa_id:    SESS.empresaId,
+    legacy_id:     userObj.id || '',
+    nome:          userObj.nome || '',
+    email:         userObj.email || '',
+    role:          userObj.role || 'vend',
+    tipo_usuario:  userObj.tipo_usuario || '',
+    ativo:         userObj.ativo !== false,
+    telefone:      userObj.telefone || '',
+    status:        userObj.status || 'ativo',
+    deleted:       userObj.deleted || false,
+    criado_em:     userObj.criadoEm || new Date().toISOString()
+  };
+}
+
+function _usuarioFromSb(row){
+  // Converte linha Supabase (snake_case) → local (camelCase)
+  if(!row) return null;
+  return {
+    id:            row.legacy_id || row.id || '',
+    nome:          row.nome || '',
+    email:         row.email || '',
+    role:          row.role || 'vend',
+    tipo_usuario:  row.tipo_usuario || '',
+    ativo:         row.ativo !== false,
+    telefone:      row.telefone || '',
+    status:        row.status || 'ativo',
+    deleted:       row.deleted || false,
+    criadoEm:      row.criado_em
+  };
+}
+
+async function loadUsuariosFromSb(){
+  // Carrega usuários da empresa no Supabase e popula o cache localStorage
+  if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  try {
+    var { data, error } = await _sb
+      .from('usuarios')
+      .select('*')
+      .eq('empresa_id', SESS.empresaId)
+      .eq('deleted', false)
+      .order('criado_em', { ascending: false });
+    
+    if(error) {
+      console.log('[Fluxy/USU] RLS ou erro ao carregar usuários:', error.message);
+      return;
+    }
+    
+    var usuários = (data || []).map(function(row){ return _usuarioFromSb(row); });
+    stor_set(KEYS.users, usuários);
+    console.log('[Fluxy/USU] '+usuários.length+' usuários carregados do Supabase');
+  } catch(e) {
+    console.error('[Fluxy/USU] Erro ao loadUsuariosFromSb:', e.message);
+  }
+}
+
+async function _usuarioUpsertSb(usuarioObj){
+  // Insert ou update de usuário no Supabase (async)
+  if(!CLOUD_ENABLED || !_sb || !SESS) return null;
+  var sbObj = _usuarioToSb(usuarioObj);
+  if(!sbObj) return null;
+  
+  try {
+    // Upsert usuário
+    var { data, error } = usuarioObj.id && usuarioObj.id.length > 5
+      ? await _sb
+          .from('usuarios')
+          .update(sbObj)
+          .eq('legacy_id', usuarioObj.id)
+          .eq('empresa_id', SESS.empresaId)
+          .select()
+          .single()
+      : await _sb
+          .from('usuarios')
+          .insert([{ ...sbObj }])
+          .select()
+          .single();
+    
+    if(error) {
+      console.error('[Fluxy/USU] Erro ao upsert usuário:', error.message);
+      return null;
+    }
+    console.log('[Fluxy/USU] Usuário '+usuarioObj.email+' salvo no Supabase');
+    return data;
+  } catch(e) {
+    console.error('[Fluxy/USU] Erro inesperado em _usuarioUpsertSb:', e.message);
+    return null;
+  }
+}
+
+async function _usuarioDeleteSb(id){
+  // Soft delete (deleted=true) no Supabase
+  if(!CLOUD_ENABLED || !_sb || !SESS || !id) return;
+  try {
+    var { error } = await _sb
+      .from('usuarios')
+      .update({ deleted: true, deleted_at: new Date().toISOString() })
+      .eq('legacy_id', id)
+      .eq('empresa_id', SESS.empresaId);
+    
+    if(error) {
+      console.error('[Fluxy/USU] Erro ao deletar usuário:', error.message);
+      return;
+    }
+    console.log('[Fluxy/USU] Usuário '+id+' marcado como deletado no Supabase');
+  } catch(e) {
+    console.error('[Fluxy/USU] Erro inesperado em _usuarioDeleteSb:', e.message);
+  }
+}
 
 function getUsers(){ return stor_get(KEYS.users) || []; }
 function saveUsers(arr){
@@ -4059,6 +4175,10 @@ function syncCloud(key, data){
       case 'rotas':
         // Carrega rotas da empresa no boot (Etapa 7A)
         loadRotasFromSb();
+        break;
+      case 'usuarios':
+        // Carrega usuários da empresa no boot (Etapa 8A)
+        loadUsuariosFromSb();
         break;
       default:
         break;
@@ -9551,7 +9671,7 @@ function renderGerente(){
         +(p.commVal?'<div style="font-size:12px;color:var(--t2);margin-bottom:6px">Comissão: <span style="font-family:monospace;font-weight:700;color:var(--purple)">'+fmt(p.commVal)+'</span></div>':'')
         +(p.obs?'<div style="font-size:11px;color:var(--t3);padding:6px 8px;background:var(--s2);border-radius:6px;margin-bottom:8px">💬 '+sanitize(p.obs)+'</div>':'')
         +(isAprov&&p.aprovadoEm?'<div style="font-size:11px;color:var(--green);padding:6px 8px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:6px;margin-bottom:8px">✅ Aprovado '+fmtDT(p.aprovadoEm)+(p.aprovadoPor?' por <strong>'+p.aprovadoPor+'</strong>':'')+(p.gerenteObs?' — "'+p.gerenteObs+'"':'')+'</div>':'')
-        +(isRecus?'<div style="font-size:11px;color:#F97316;padding:6px 8px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:6px;margin-bottom:8px">⛔ Recusado'+(p.recusadoPor?' por '+p.recusadoPor:'')+(p.recusadoEm?' em '+fmtDT(p.recusadoEm):'')+(p.gerenteObs?' — "'+p.gerenteObs+'"':'')+'</div>':'')
+        +(isRecus?'<div style="font-size:11px;color:#F97316;padding:6px 8px;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:6px;margin-bottom:8px">⛔ Recusado'+(p.recusadoPor?' por '+p.recusadoPor:'')+(p.recusadoEm?' em '+fmtDT(p.recusadoEm):'')+(p.gerenteObs?' ��� "'+p.gerenteObs+'"':'')+'</div>':'')
         +(isCancel?'<div style="font-size:11px;color:var(--red);padding:6px 8px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:6px;margin-bottom:8px">❌ Cancelado'+(p.canceladoPor?' por '+p.canceladoPor:'')+(p.canceladoEm?' em '+fmtDT(p.canceladoEm):'')+(p.cancelMotivo?' — "'+p.cancelMotivo+'"':'')+'</div>':'')
         +'<div id="gbtn-'+p.id+'" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px"></div>';
 
@@ -9990,7 +10110,7 @@ function _updateNotifBadge(){
   if(badge){ badge.textContent=n>0?n:''; badge.style.display=n>0?'flex':'none'; }
 }
 
-// ── renderNotificacoes ────────────��────────────────────────────
+// ── renderNotificacoes ─────────��──��────────────────────────────
 function renderNotificacoes(){
   console.log('[NOTIF] render called, currentView=',currentView);
   try{
@@ -11215,6 +11335,8 @@ function saveUser(editId){
     }
   }
   saveUsers(users);
+  // Sincroniza com Supabase se habilitado (async, sem bloquear UI)
+  if(CLOUD_ENABLED) _usuarioUpsertSb(editId ? users.find(function(u){ return u.id===editId; }) : users[users.length-1]).catch(function(e){ console.error('[Fluxy/USU] erro em _usuarioUpsertSb:', e); });
   logHist(editId?'Editou usuário':'Cadastrou usuário', nome+' ('+roleLabel(role)+') status: '+newStatus);
   closeModal();
   safeRender('usuarios',renderUsuarios);
@@ -11282,8 +11404,12 @@ function confirmDeleteUser(id){
   if(!target||idx<0) return;
   var admins=users.filter(function(u){return u.role==='adm';});
   if(target.role==='adm'&&admins.length<=1){toast('Não é possível excluir o único administrador.','err');return;}
-  users.splice(idx,1);
+  // Soft delete em lugar de hard delete
+  users[idx].deleted=true;
+  users[idx].deletedAt=new Date().toISOString();
   saveUsers(users);
+  // Sincroniza exclusão com Supabase (async, sem bloquear)
+  if(CLOUD_ENABLED && id) _usuarioDeleteSb(id).catch(function(e){ console.error('[Fluxy/USU] erro em _usuarioDeleteSb:', e); });
   logHist('Excluiu usuário', target.nome+' ('+target.email+')');
   closeModal();
   safeRender('usuarios',renderUsuarios);
@@ -11327,7 +11453,7 @@ function setUserStatus(id,newStatus){
   toast(newStatus==='ativo'?'✅ Acesso reativado!':newStatus==='bloqueado'?'🚫 Acesso bloqueado!':'❌ Acesso removido!');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════��
 // ROTAS
 function setRotaTab(tab){
   rotaTab=tab;
@@ -12758,7 +12884,7 @@ function nvParaCli(cliId){
 
 // ══���════════════════════════════════════════════════════════
 // SEED (dados de exemplo)
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════��════════════
 function seed(){
   if(!getProds().length){
     saveProds([
@@ -12788,13 +12914,14 @@ seed();
 loadSession();
 
 if(SESS){
-  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes, produtos, pedidos, cobranças, rotas)
+  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes, produtos, pedidos, cobranças, rotas, usuários)
   if(CLOUD_ENABLED) {
     syncCloud('clis');
     syncCloud('prods');
     syncCloud('peds');
     syncCloud('cobr');
     syncCloud('rotas');
+    syncCloud('usuarios');
   }
   showApp();
 } else {
