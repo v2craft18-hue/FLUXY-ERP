@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═══════════�������═�����������������═════════════════════════════
+/* ═════════���═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -1246,11 +1246,15 @@ select option {
     <button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);letter-spacing:.01em" onclick="doLogin()">
       Entrar no sistema &nbsp;→
     </button>
-    <div style="text-align:center;margin-top:22px;padding-top:18px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
+    <div style="text-align:center;margin-top:26px;margin-bottom:26px">
+      <p style="font-size:13px;color:var(--t2);margin:0 0 12px 0">Não possui conta?</p>
+      <button class="btn btn-p" style="width:100%;justify-content:center;padding:11px;font-size:13px;border-radius:var(--r2);font-weight:600;background:var(--green);color:white;opacity:0.9" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'" onclick="go('signup')">
+        ✨ Criar Conta Grátis
+      </button>
+    </div>
+    <div style="text-align:center;padding-top:16px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
       <button onclick="fixAccess()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">Problemas para acessar?</button>
       <button onclick="openResetPwd()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">🔑 Esqueci minha senha</button>
-      <button onclick="go('signup')" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s;font-weight:600" onmouseover="this.style.color='var(--green)'" onmouseout="this.style.color='var(--t3)'">✨ Criar conta</button>
-    </div>
   </div>
 </div>
 
@@ -4502,6 +4506,7 @@ function isValidCNPJ(cnpj){
 
 // Renderizar tela de signup
 function renderSignup(){
+  console.log('[v0] renderSignup() called');
   var html='<div class="pg"><div class="pg-header"><h1>Criar Conta</h1><p>Crie sua empresa e comece agora</p></div><div class="form-container" style="max-width:400px;margin:40px auto">';
   
   html+='<div class="field"><label>Nome da Empresa *</label><input id="su-empresa" type="text" placeholder="Sua Empresa LTDA" maxlength="100"></div>';
@@ -4773,6 +4778,7 @@ function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboa
 
 function go(v){
   console.log('[GO] called with v=',v,'SESS=',SESS?SESS.role:'null','currentView=',currentView);
+  console.log('[v0] go() chamada: v='+v+', SESS='+(SESS?SESS.role:'null')+', currentView='+currentView);
   clearMemo();
   try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
@@ -6704,7 +6710,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
       if(nfApproved) bw.appendChild(mkb('📲 Nota','btn-gr btn-sm',function(){shareNota(pid);}));
     }
 
-    // ── ADM-only: Cancel / Status / Delete ────────────────────────
+    // ── ADM-only: Cancel / Status / Delete ────────��───────────────
     if(isAdm()){
       if(!pCancelled) bw.appendChild(mkb('❌ Cancelar','btn-r btn-sm',function(){cancelPed(pid);}));
       else bw.appendChild(mkb('🔄 Reativar','btn-y btn-sm',function(){chgStatus(pid);}));
@@ -8353,7 +8359,7 @@ function exportRelPDF(){
   var periodoLabel={hoje:'Hoje',semana:'Últimos 7 dias',mes:'Este mês',tudo:'Todo o período'}[relPeriod]||relPeriod;
   var now=new Date().toISOString();
 
-  // ── Build products table data ────────────────────────────────────────────
+  // ── Build products table data ───────────────��────────────────────────────
   var prodMapa={};
   for(var i=0;i<aprovados.length;i++){
     var itens=aprovados[i].itens||[];
@@ -11310,7 +11316,7 @@ function clearHist(){
   toast('🗑️ Histórico limpo.');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ════════════════════════════════��══════════════════════════
 // USUÁRIOS
 // ════════════════════════════════════════��═════���════════════
 var usrTab='all';
