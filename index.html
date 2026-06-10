@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════���═════════════════════════════
+/* ═════════════�����═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -782,7 +782,7 @@ tr:last-child td { border-bottom:none }
 }
 
 
-/* ════���══════════════════════════════════════
+/* ══���═���══════════════════════════════════════
    PERFORMANCE
 ═══════════════════════════════════════════ */
 /* GPU compositing layer for scroll container */
@@ -1135,7 +1135,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ───────────────────────────── */
+/* ── General mobile responsiveness ───────────────────────���───── */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -2415,6 +2415,155 @@ async function _cliDeleteSb(id){
 
 function getClis(){ return stor_get(KEYS.clis) || []; }
 function saveClis(arr){ stor_set(KEYS.clis, arr); }
+// ── Supabase: Synchronization for Produtos (Etapa 4) ───────────────
+// Todas as operações respeitam empresa_id (RLS) e possuem fallback local
+
+function _prodToSb(prodObj){
+  // Converte objeto local (camelCase) → formato Supabase (snake_case + empresa_id)
+  if(!prodObj || !SESS) return null;
+  return {
+    empresa_id:   SESS.empresaId,
+    nome:         prodObj.nome || '',
+    descricao:    prodObj.descricao || '',
+    codigo:       prodObj.codInt || prodObj.codigo || '',
+    cod_barras:   prodObj.codigoBarras || prodObj.sku || '',
+    sku:          prodObj.sku || '',
+    categoria:    prodObj.cat || prodObj.categoria || '',
+    marca:        prodObj.marca || '',
+    unidade:      prodObj.un || 'UN',
+    ncm:          prodObj.ncm || '',
+    cfop:         prodObj.cfop || '5102',
+    cst_icms:     prodObj.cst || '102',
+    aliq_icms:    prodObj.icms || 0,
+    preco:        prodObj.preco || 0,
+    preco_min:    prodObj.precoMin || 0,
+    preco_custo:  prodObj.precoCusto || 0,
+    preco_atacado: prodObj.precoAtacado || 0,
+    margem:       prodObj.margem || 0,
+    estoque:      prodObj.estoque || 0,
+    estoque_min:  prodObj.estMin || 0,
+    estoque_max:  prodObj.estMax || 0,
+    estoque_reservado: prodObj.estReservado || 0,
+    peso_bruto:   prodObj.peso ? parseFloat(prodObj.peso) : 0,
+    peso_liq:     prodObj.pesoLiq || 0,
+    ativo:        prodObj.ativo !== false,
+    origem:       prodObj.origem || '0'
+  };
+}
+
+function _prodFromSb(row){
+  // Converte linha Supabase (snake_case) → formato local (camelCase)
+  if(!row) return null;
+  return {
+    id:            row.id,
+    nome:          row.nome || '',
+    descricao:     row.descricao || '',
+    codInt:        row.codigo || '',
+    codigo:        row.codigo || '',
+    codigoBarras:  row.cod_barras || row.sku || '',
+    sku:           row.sku || '',
+    cat:           row.categoria || '',
+    categoria:     row.categoria || '',
+    marca:         row.marca || '',
+    un:            row.unidade || 'UN',
+    ncm:           row.ncm || '',
+    cfop:          row.cfop || '5102',
+    cst:           row.cst_icms || '102',
+    icms:          row.aliq_icms || 0,
+    preco:         row.preco || 0,
+    precoMin:      row.preco_min || 0,
+    precoCusto:    row.preco_custo || 0,
+    precoAtacado:  row.preco_atacado || 0,
+    margem:        row.margem || 0,
+    estoque:       row.estoque || 0,
+    estMin:        row.estoque_min || 0,
+    estMax:        row.estoque_max || 0,
+    estReservado:  row.estoque_reservado || 0,
+    peso:          row.peso_bruto ? String(row.peso_bruto) : '0',
+    pesoLiq:       row.peso_liq || 0,
+    ativo:         row.ativo !== false,
+    origem:        row.origem || '0',
+    criadoEm:      row.criado_em
+  };
+}
+
+async function loadProdsFromSb(){
+  // Carrega produtos da empresa no Supabase e popula o cache localStorage
+  if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  try {
+    var { data, error } = await _sb
+      .from('produtos')
+      .select('*')
+      .eq('empresa_id', SESS.empresaId)
+      .eq('ativo', true);
+    
+    if(error) {
+      console.log('[Fluxy/PROD] RLS ou erro ao carregar produtos:', error.message);
+      return;
+    }
+    
+    var prods = (data || []).map(function(row){ return _prodFromSb(row); });
+    stor_set(KEYS.prods, prods);
+    console.log('[Fluxy/PROD] '+prods.length+' produtos carregados do Supabase');
+  } catch(e) {
+    console.error('[Fluxy/PROD] Erro ao loadProdsFromSb:', e.message);
+  }
+}
+
+async function _prodUpsertSb(prodObj){
+  // Insert ou update de 1 produto no Supabase (async, sem bloquear UI)
+  if(!CLOUD_ENABLED || !_sb || !SESS) return null;
+  var sbObj = _prodToSb(prodObj);
+  if(!sbObj) return null;
+  
+  try {
+    // Se tem ID, é update; senão, é insert
+    var { data, error } = prodObj.id && prodObj.id.length > 20
+      ? await _sb
+          .from('produtos')
+          .update(sbObj)
+          .eq('id', prodObj.id)
+          .eq('empresa_id', SESS.empresaId)
+          .select()
+          .single()
+      : await _sb
+          .from('produtos')
+          .insert([{ ...sbObj, id: prodObj.id }])
+          .select()
+          .single();
+    
+    if(error) {
+      console.error('[Fluxy/PROD] Erro ao upsert produto:', error.message);
+      return null;
+    }
+    console.log('[Fluxy/PROD] Produto '+prodObj.id+' salvo no Supabase');
+    return data ? _prodFromSb(data) : null;
+  } catch(e) {
+    console.error('[Fluxy/PROD] Erro inesperado em _prodUpsertSb:', e.message);
+    return null;
+  }
+}
+
+async function _prodDeleteSb(id){
+  // Soft delete (ativo=false) no Supabase
+  if(!CLOUD_ENABLED || !_sb || !SESS || !id) return;
+  try {
+    var { error } = await _sb
+      .from('produtos')
+      .update({ ativo: false })
+      .eq('id', id)
+      .eq('empresa_id', SESS.empresaId);
+    
+    if(error) {
+      console.error('[Fluxy/PROD] Erro ao deletar produto:', error.message);
+      return;
+    }
+    console.log('[Fluxy/PROD] Produto '+id+' desativado no Supabase');
+  } catch(e) {
+    console.error('[Fluxy/PROD] Erro inesperado em _prodDeleteSb:', e.message);
+  }
+}
+
 function getProds(){ return stor_get(KEYS.prods) || []; }
 function saveProds(arr){ stor_set(KEYS.prods, arr); }
 function getEstMov(){ return stor_get(KEYS.estMov) || []; }
@@ -3584,11 +3733,16 @@ function syncCloud(key, data){
         // Carrega clientes da empresa no boot
         loadClisFromSb();
         break;
+      case 'prods':
+        // Carrega produtos da empresa no boot (Etapa 4)
+        loadProdsFromSb();
+        break;
       // case 'peds': loadPedsFromSb(); break; // Etapa 5
-      // case 'prods': loadProdsFromSb(); break; // Etapa 4
       default:
         break;
     }
+  }
+}
   }
 }
 
@@ -5190,6 +5344,8 @@ function saveProd(editId){
     obj.id=uid(); prods.push(obj);
   }
   saveProds(prods);
+  // Sincroniza com Supabase se habilitado (async, sem bloquear UI)
+  if(CLOUD_ENABLED && obj.id) _prodUpsertSb(obj).catch(function(e){ console.error('[Fluxy/PROD] erro em _prodUpsertSb:', e); });
   // Log stock adjustment if qty changed on edit
   if(editId && estNovo!==estAtual){
     var mov2=getEstMov();
@@ -5215,6 +5371,8 @@ function delProd(id){
   var n = [];
   for(var i=0;i<prods.length;i++){ if(prods[i].id!==id) n.push(prods[i]); }
   saveProds(n);
+  // Sincroniza exclusão com Supabase (async, sem bloquear)
+  if(CLOUD_ENABLED && id) _prodDeleteSb(id).catch(function(e){ console.error('[Fluxy/PROD] erro em _prodDeleteSb:', e); });
   safeRender('produtos',renderProd);
   toast('🗑️ Produto excluído.');
 }
@@ -11047,7 +11205,7 @@ function delRota(id){
 
 // ── Add/remove pedido from rota ─────────────────────────────────
 function rotaAddPed(rotaId, pedId){
-  if(!isAdm()&&!isGer()){ toast('Sem permissão.','err'); return; }
+  if(!isAdm()&&!isGer()){ toast('Sem permiss��o.','err'); return; }
   var rs=getRotas();
   for(var i=0;i<rs.length;i++) if(rs[i].id===rotaId){
     if(!rs[i].pedIds) rs[i].pedIds=[];
@@ -12177,8 +12335,11 @@ seed();
 loadSession();
 
 if(SESS){
-  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes)
-  if(CLOUD_ENABLED) syncCloud('clis');
+  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes, produtos)
+  if(CLOUD_ENABLED) {
+    syncCloud('clis');
+    syncCloud('prods');
+  }
   showApp();
 } else {
   document.getElementById('login-wrap').style.display = 'flex';
