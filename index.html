@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════�������������═════════════════════════════
+/* ═════════════���������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -1135,7 +1135,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ───────────���─���─────────���───── */
+/* ── General mobile responsiveness ─────────���─���─���─────────���───── */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -1939,6 +1939,8 @@ if(typeof APP_STATE==='undefined'){
              comm:{period:'mes'},entr:{tab:'pendente'},nf:{tab:'aguardando'},
              ger:{tab:'pendente_ger'},cobr:{tab:'pendente'},usr:{tab:'all'}},
     cache:{},views:{},
+    migration_state: { clis: false, prods: false, peds: false, cobr: false, rotas: false, usuarios: false },
+    migration_report: { total: 0, migrada: 0, ignorada: 0, atualizada: 0, erro: 0, detalhes: [] },
     get:function(p,d){try{return p.split('.').reduce(function(o,k){return o==null?undefined:o[k];},window.APP_STATE)||(d===undefined?undefined:d);}catch(e){return d===undefined?undefined:d;}},
     set:function(p,v){try{var a=p.split('.');var o=window.APP_STATE;for(var i=0;i<a.length-1;i++){if(o[a[i]]==null||typeof o[a[i]]!=='object')o[a[i]]={};o=o[a[i]];}o[a[a.length-1]]=v;}catch(e){}}
   };
@@ -4153,32 +4155,39 @@ var CLOUD_PROVIDER = 'none'; // 'firebase' | 'supabase' | 'none'
 function syncCloud(key, data){
   if(!CLOUD_ENABLED||CLOUD_PROVIDER==='none') return;
   
-  // ── Supabase: Sincronizacao de modulos (Etapa 3+) ────────────────
+  // ── Supabase: Sincronizacao de modulos (Etapa 3+) + Migration (Etapa 9) ────
   if(CLOUD_PROVIDER==='supabase' && _sb && SESS){
     switch(key){
       case 'clis':
-        // Carrega clientes da empresa no boot
-        loadClisFromSb();
+        // Se já migrado, carregar do Supabase; senão, loadFromSb faz sync
+        if(APP_STATE.migration_state.clis || stor_get(KEYS.clis) && stor_get(KEYS.clis).length > 0) {
+          loadClisFromSb();
+        }
         break;
       case 'prods':
-        // Carrega produtos da empresa no boot (Etapa 4)
-        loadProdsFromSb();
+        if(APP_STATE.migration_state.prods || stor_get(KEYS.prods) && stor_get(KEYS.prods).length > 0) {
+          loadProdsFromSb();
+        }
         break;
       case 'peds':
-        // Carrega pedidos da empresa no boot (Etapa 5)
-        loadPedidosFromSb();
+        if(APP_STATE.migration_state.peds || stor_get(KEYS.peds) && stor_get(KEYS.peds).length > 0) {
+          loadPedidosFromSb();
+        }
         break;
       case 'cobr':
-        // Carrega cobranças da empresa no boot (Etapa 6)
-        loadCobrFromSb();
+        if(APP_STATE.migration_state.cobr || stor_get(KEYS.cobr) && stor_get(KEYS.cobr).length > 0) {
+          loadCobrFromSb();
+        }
         break;
       case 'rotas':
-        // Carrega rotas da empresa no boot (Etapa 7A)
-        loadRotasFromSb();
+        if(APP_STATE.migration_state.rotas || stor_get(KEYS.rotas) && stor_get(KEYS.rotas).length > 0) {
+          loadRotasFromSb();
+        }
         break;
       case 'usuarios':
-        // Carrega usuários da empresa no boot (Etapa 8A)
-        loadUsuariosFromSb();
+        if(APP_STATE.migration_state.usuarios || stor_get(KEYS.users) && stor_get(KEYS.users).length > 0) {
+          loadUsuariosFromSb();
+        }
         break;
       default:
         break;
@@ -10915,7 +10924,7 @@ function verFotoCobr(cobrId){
 
 // STEP 1 (Vendedor): mark as received — waits for gerente confirmation
 function marcarPago(cobrId){
-  openModal('<div class="modal-title">💰 Informar Recebimento</div>'
+  openModal('<div class="modal-title">�� Informar Recebimento</div>'
     +'<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:var(--r2);padding:12px;margin-bottom:14px">'
       +'<div class="fs13 t1 mb4">⚠️ O pagamento precisará ser confirmado pelo gerente.</div>'
       +'<div class="fs12 t3">Só finaliza após confirmação.</div>'
@@ -11660,7 +11669,116 @@ async function _rotaDeleteSb(id){
   }
 }
 
+// ── Supabase: Migração Automática de Dados (Etapa 9) ───────────────
+// Migra dados locais para Supabase mantendo cache como contingência
+
+async function migrateDataToSb(){
+  // Orquestra migração de todos 6 módulos
+  if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  
+  APP_STATE.migration_report = { total: 0, migrada: 0, ignorada: 0, atualizada: 0, erro: 0, detalhes: [] };
+  console.log('[Fluxy/MIG] Iniciando migração automática de dados locais...');
+  
+  var modules = [
+    { key: 'clis', table: 'clientes', name: 'Clientes', converter: _cliToSb },
+    { key: 'prods', table: 'produtos', name: 'Produtos', converter: _prodToSb },
+    { key: 'peds', table: 'pedidos', name: 'Pedidos', converter: _pedToSb },
+    { key: 'cobr', table: 'cobracas', name: 'Cobranças', converter: _cobrToSb },
+    { key: 'rotas', table: 'rotas', name: 'Rotas', converter: _rotaToSb },
+    { key: 'usuarios', table: 'usuarios', name: 'Usuários', converter: _usuarioToSb }
+  ];
+  
+  for(var i=0; i<modules.length; i++){
+    await _migrateModulo(modules[i].key, modules[i].table, modules[i].name, modules[i].converter);
+  }
+  
+  // Salvar estado de migração
+  stor_set('migration_state', APP_STATE.migration_state);
+  
+  console.log('[Fluxy/MIG] Migração concluída!', APP_STATE.migration_report);
+  logHist('Sistema', 'Migração: '+APP_STATE.migration_report.migrada+' migrados, '+APP_STATE.migration_report.ignorada+' ignorados, '+APP_STATE.migration_report.erro+' erros');
+}
+
+async function _migrateModulo(key, table, name, converter){
+  // Migra um módulo específico
+  if(APP_STATE.migration_state[key]) {
+    console.log('[Fluxy/MIG] '+name+' já migrado, pulando');
+    return;
+  }
+  
+  var arr = stor_get(KEYS[key]) || [];
+  
+  if(!arr || arr.length === 0){
+    console.log('[Fluxy/MIG] '+name+' vazio ('+key+'), marcando como migrado');
+    APP_STATE.migration_state[key] = true;
+    return;
+  }
+  
+  try {
+    console.log('[Fluxy/MIG] Migrando '+arr.length+' registros de '+name+'...');
+    
+    // Converter registros
+    var sbRecords = [];
+    for(var i=0; i<arr.length; i++){
+      var record = converter(arr[i]);
+      if(record){
+        sbRecords.push(record);
+      } else {
+        APP_STATE.migration_report.ignorada++;
+      }
+    }
+    
+    if(sbRecords.length === 0){
+      console.log('[Fluxy/MIG] '+name+': nenhum registro válido para migrar');
+      APP_STATE.migration_state[key] = true;
+      return;
+    }
+    
+    // Batch upsert (max 1000 por request)
+    var BATCH_SIZE = 1000;
+    var inserted = 0;
+    for(var b=0; b<sbRecords.length; b+=BATCH_SIZE){
+      var batch = sbRecords.slice(b, b+BATCH_SIZE);
+      var { data, error } = await _sb
+        .from(table)
+        .upsert(batch, { onConflict: 'id,empresa_id' });
+      
+      if(error){
+        throw new Error(table+': '+error.message);
+      }
+      
+      inserted += (data ? data.length : batch.length);
+    }
+    
+    // ✅ IMPORTANTE: NÃO limpar localStorage — manter cache
+    // localStorage permanece como contingência em caso de desconexão
+    
+    APP_STATE.migration_state[key] = true;
+    APP_STATE.migration_report.total += arr.length;
+    APP_STATE.migration_report.migrada += inserted;
+    
+    console.log('[Fluxy/MIG] ✅ '+name+': '+inserted+' registros migrados (cache local preservado)');
+    APP_STATE.migration_report.detalhes.push(name+': '+inserted+' migrados');
+    
+  } catch(e){
+    console.error('[Fluxy/MIG] Erro ao migrar '+name+':', e.message);
+    APP_STATE.migration_report.erro++;
+    APP_STATE.migration_report.detalhes.push(name+': ❌ '+e.message);
+    logHist('Migração', '⚠️ Erro ao migrar '+name+': '+e.message, 'warning');
+    // NÃO marcar como migrado em caso de erro — retry na próxima
+  }
+}
+
 function getRotas(){ return stor_get(KEYS.rotas) || []; }
+
+// Função auxiliar para exibir relatório de migração (debug/admin)
+function getMigrationReport(){
+  return {
+    estado: APP_STATE.migration_state,
+    relatorio: APP_STATE.migration_report,
+    resumo: 'Total: '+APP_STATE.migration_report.total+' | Migrados: '+APP_STATE.migration_report.migrada+' | Ignorados: '+APP_STATE.migration_report.ignorada+' | Erros: '+APP_STATE.migration_report.erro
+  };
+}
 function saveRotas(arr){ stor_set(KEYS.rotas, arr); }
 
 // Get single rota by id
@@ -12922,6 +13040,8 @@ if(SESS){
     syncCloud('cobr');
     syncCloud('rotas');
     syncCloud('usuarios');
+    // Migração automática de dados locais para Supabase (Etapa 9)
+    migrateDataToSb().catch(function(e){ console.error('[Fluxy/MIG] Erro na migração:', e.message); });
   }
   showApp();
 } else {
