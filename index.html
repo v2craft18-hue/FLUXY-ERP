@@ -405,7 +405,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 .view { display:none; width:100%; box-sizing:border-box; padding:16px 20px 32px; touch-action:pan-y; }
 .view.on { display:block }
 
-/* ════���══════════════════════════════════════
+/* ════�����══════════════════════════════════════
    PAGE HEADER
 ═══════════════════════════════════════════ */
 .page-title {
@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═══════════�����═�����������������═════════════════════════════
+/* ═══════════�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +577,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-═════════════════════════════════════════���═ */
+═══════════════════════════════════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -1730,86 +1730,11 @@ select option {
   </div><!-- #main -->
 </div><!-- #app -->
 
-<!-- Modal -->
-<div id="modal-bg" onclick="closeModalBg(event)">
-  <div id="modal-box">
-    <div id="modal-body"></div>
+  <div id="modal-bg" onclick="closeModalBg(event)">
+    <div id="modal-box">
+      <div id="modal-body"></div>
+    </div>
   </div>
-</div>
-
-
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
 
 <!-- ETAPA 12: Signup View -->
 <div id="v-signup" class="view" style="display:none;background:linear-gradient(135deg,var(--bg) 0%,var(--b2) 100%)">
@@ -5050,7 +4975,7 @@ function closeMob(){
   document.body.style.overflow='';
 }
 
-// ═══════════════════════════════════════════════���═══════════
+// ══════════════════════════════════════════════������═══════════
 // UTILS
 // ═══════════════════════════════════════════════════════════
 function fmt(v){
@@ -11251,7 +11176,7 @@ function gerRecusarPagamentoOk(cobrId){
   closeModal();
   applyRoleNav();
   safeRender('cobranças',renderCobr);
-  toast('❌ Confirmação recusada. Cobrança voltou para pendente.','ok');
+  toast('❌ Confirma��ão recusada. Cobrança voltou para pendente.','ok');
 }
 
 function confirmarPago(cobrId){
@@ -13573,7 +13498,7 @@ function pwaInstall(){
   });
 }
 
-// ── Wire up buttons ───────────���──────────────────────────────────
+// ── Wire up buttons ────────���──���──────────────────────────────────
 document.addEventListener('DOMContentLoaded',function(){
   var installBtn=document.getElementById('pwa-install-btn');
   var dismissBtn=document.getElementById('pwa-dismiss-btn');
