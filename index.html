@@ -405,7 +405,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 .view { display:none; width:100%; box-sizing:border-box; padding:16px 20px 32px; touch-action:pan-y; }
 .view.on { display:block }
 
-/* ════���══════════════════════════════════════
+/* ════�����══════════════════════════════════════
    PAGE HEADER
 ═══════════════════════════════════════════ */
 .page-title {
@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════�����������������═════════════════════════════
+/* ═════════���═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +577,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-═══════════════════════════════════════════ */
+═══════════════════════════════════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -1135,7 +1135,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ─────────���─���─���─────────���───── */
+/* ── General mobile responsiveness ───���─────���─���─���─────────���───── */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -1246,10 +1246,15 @@ select option {
     <button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);letter-spacing:.01em" onclick="doLogin()">
       Entrar no sistema &nbsp;→
     </button>
-    <div style="text-align:center;margin-top:22px;padding-top:18px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px">
+    <div style="text-align:center;margin-top:26px;margin-bottom:26px">
+      <p style="font-size:13px;color:var(--t2);margin:0 0 12px 0">Não possui conta?</p>
+      <button class="btn btn-p" style="width:100%;justify-content:center;padding:11px;font-size:13px;border-radius:var(--r2);font-weight:600;background:var(--green);color:white;opacity:0.9" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'" onclick="go('signup')">
+        ✨ Criar Conta Grátis
+      </button>
+    </div>
+    <div style="text-align:center;padding-top:16px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
       <button onclick="fixAccess()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">Problemas para acessar?</button>
       <button onclick="openResetPwd()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">🔑 Esqueci minha senha</button>
-    </div>
   </div>
 </div>
 
@@ -1725,93 +1730,21 @@ select option {
         <div id="notif-list"></div>
       </div>
 
+      <!-- ETAPA 12: Signup View -->
+      <div id="v-signup" class="view" style="display:none;background:linear-gradient(135deg,var(--bg) 0%,var(--b2) 100%)">
+        <!-- Será preenchido por renderSignup() -->
+      </div>
+
     </div><!-- #content -->
   </div><!-- #main -->
 </div><!-- #app -->
 
-<!-- Modal -->
-<div id="modal-bg" onclick="closeModalBg(event)">
-  <div id="modal-box">
-    <div id="modal-body"></div>
+  <div id="modal-bg" onclick="closeModalBg(event)">
+    <div id="modal-box">
+      <div id="modal-body"></div>
+    </div>
   </div>
-</div>
 
-
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
 <script>
 
 
@@ -2018,7 +1951,7 @@ var APP_STATE=(function(){
   return s;
 })();
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════���═════
 // STATE HELPERS  (safe wrappers for APP_STATE)
 // ════════════════════════════════════════════════════════════════
 var _stateDebug = false; // set true to see all state changes in console
@@ -4454,7 +4387,7 @@ function clearAllTimers(){
 
 // ════════════════════════════════════════════════════════════════
 // CLEANUP ENGINE — prevent listener / timer / observer leaks
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════���═════════════════════
 var _cleanups={};
 function registerCleanup(viewId, fn){
   if(!_cleanups[viewId]) _cleanups[viewId]=[];
@@ -4535,7 +4468,200 @@ function recordFailedLogin(){
 }
 function resetLoginAttempts(){ _loginAttempts=0; _loginLockedUntil=0; }
 
+// ── ETAPA 12: Auto Cadastro SaaS ───────────────────────────────────────────
+
+// Validações de formulário de signup
+function isValidEmail(email){
+  var re=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email.trim());
+}
+
+function isPasswordStrong(pwd){
+  // Mínimo 8 caracteres, misto (letra + número ou símbolo)
+  if(pwd.length<8) return false;
+  var hasLetter=/[a-zA-Z]/.test(pwd);
+  var hasNumber=/[0-9]/.test(pwd);
+  var hasSymbol=/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd);
+  return hasLetter && (hasNumber || hasSymbol);
+}
+
+function isEmailUnique(email){
+  var users=getUsers()||[];
+  email=email.trim().toLowerCase();
+  for(var i=0;i<users.length;i++){
+    if(users[i].email && users[i].email.trim().toLowerCase()===email){
+      return false;
+    }
+  }
+  return true;
+}
+
+function isValidCNPJ(cnpj){
+  if(!cnpj || cnpj.length===0) return true; // CNPJ é opcional
+  // Remove formatação
+  var clean=cnpj.replace(/\D/g,'');
+  // Validar tamanho
+  return clean.length===14;
+}
+
+// Renderizar tela de signup
+function renderSignup(){
+  var html='<div class="pg"><div class="pg-header"><h1>Criar Conta</h1><p>Crie sua empresa e comece agora</p></div><div class="form-container" style="max-width:400px;margin:40px auto">';
+  
+  html+='<div class="field"><label>Nome da Empresa *</label><input id="su-empresa" type="text" placeholder="Sua Empresa LTDA" maxlength="100"></div>';
+  html+='<div class="field"><label>Seu Nome *</label><input id="su-nome" type="text" placeholder="João Silva" maxlength="100"></div>';
+  html+='<div class="field"><label>E-mail *</label><input id="su-email" type="email" placeholder="seu@email.com" maxlength="100"></div>';
+  html+='<div class="field"><label>Senha *</label><input id="su-pwd" type="password" placeholder="••••••••" minlength="8"></div>';
+  html+='<div class="field" style="margin-bottom:26px"><label>Confirmar Senha *</label><input id="su-pwd-confirm" type="password" placeholder="••••••••" minlength="8"></div>';
+  
+  html+='<div class="field"><label>Telefone (opcional)</label><input id="su-phone" type="tel" placeholder="(11) 99999-9999" maxlength="20"></div>';
+  html+='<div class="field" style="margin-bottom:26px"><label>CNPJ (opcional)</label><input id="su-cnpj" type="text" placeholder="12.345.678/0001-90" maxlength="18"></div>';
+  
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px"><input id="su-terms" type="checkbox"><label for="su-terms" style="margin:0;font-size:12px">Li e aceito os Termos de Uso</label></div>';
+  
+  html+='<button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2)" onclick="submitSignup()">Criar Conta</button>';
+  html+='<button class="btn btn-g" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);margin-top:10px" onclick="go(\'login\')">Voltar para Login</button>';
+  
+  html+='<div id="su-err" class="alert err" style="display:none;margin-top:16px"></div>';
+  
+  html+='</div></div>';
+  
+  var el=document.getElementById('v-signup');
+  if(el) el.innerHTML=html;
+}
+
+// Validar formulário de signup
+function validateSignupForm(){
+  var err=document.getElementById('su-err');
+  if(!err) return false;
+  err.style.display='none';
+  
+  var empresa=(document.getElementById('su-empresa').value||'').trim();
+  var nome=(document.getElementById('su-nome').value||'').trim();
+  var email=(document.getElementById('su-email').value||'').trim().toLowerCase();
+  var pwd=document.getElementById('su-pwd').value||'';
+  var pwd_confirm=document.getElementById('su-pwd-confirm').value||'';
+  var phone=(document.getElementById('su-phone').value||'').trim();
+  var cnpj=(document.getElementById('su-cnpj').value||'').trim();
+  var terms=document.getElementById('su-terms').checked;
+  
+  // Validações
+  if(!empresa){ err.textContent='Nome da empresa é obrigatório'; err.style.display='block'; return false; }
+  if(!nome){ err.textContent='Seu nome é obrigatório'; err.style.display='block'; return false; }
+  if(!email){ err.textContent='E-mail é obrigatório'; err.style.display='block'; return false; }
+  if(!isValidEmail(email)){ err.textContent='E-mail inválido'; err.style.display='block'; return false; }
+  if(!isEmailUnique(email)){ err.textContent='Este e-mail já está cadastrado'; err.style.display='block'; return false; }
+  if(!pwd){ err.textContent='Senha é obrigatória'; err.style.display='block'; return false; }
+  if(pwd.length<8){ err.textContent='Senha deve ter no mínimo 8 caracteres'; err.style.display='block'; return false; }
+  if(!isPasswordStrong(pwd)){ err.textContent='Senha deve conter letras e números/símbolos'; err.style.display='block'; return false; }
+  if(pwd!==pwd_confirm){ err.textContent='Senhas não coincidem'; err.style.display='block'; return false; }
+  if(cnpj && !isValidCNPJ(cnpj)){ err.textContent='CNPJ inválido'; err.style.display='block'; return false; }
+  if(!terms){ err.textContent='Você deve aceitar os Termos de Uso'; err.style.display='block'; return false; }
+  
+  return true;
+}
+
+// Submeter formulário de signup
+async function submitSignup(){
+  if(!validateSignupForm()) return;
+  
+  var empresa=(document.getElementById('su-empresa').value||'').trim();
+  var nome=(document.getElementById('su-nome').value||'').trim();
+  var email=(document.getElementById('su-email').value||'').trim().toLowerCase();
+  var pwd=document.getElementById('su-pwd').value||'';
+  var phone=(document.getElementById('su-phone').value||'').trim();
+  var cnpj=(document.getElementById('su-cnpj').value||'').trim();
+  
+  try {
+    // 1. Criar empresa
+    var empresaId='empr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var empresas=stor_get(KEYS.empresas)||[];
+    empresas.push({
+      id:empresaId,
+      nome:empresa,
+      cnpj:cnpj||null,
+      telefone:phone||null,
+      criado_em:new Date().toISOString(),
+      ativo:true
+    });
+    stor_set(KEYS.empresas,empresas);
+    console.log('[Fluxy/Signup] Empresa criada:',empresaId);
+    
+    // 2. Hash da senha
+    var pwdHash=await hashPwd(pwd);
+    
+    // 3. Criar usuário admin
+    var userId='usr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var users=getUsers()||[];
+    users.push({
+      id:userId,
+      empresaId:empresaId,
+      nome:nome,
+      email:email,
+      pwd:pwdHash,
+      role:'adm',
+      ativo:true,
+      criado_em:new Date().toISOString(),
+      status:'ativo'
+    });
+    saveUsers(users);
+    console.log('[Fluxy/Signup] Usuário admin criado:',userId);
+    
+    // 4. Sincronizar com Supabase se online
+    if(CLOUD_ENABLED && _sb && await isCloudAvailable()){
+      try {
+        // Criar empresa no Supabase
+        var {data:emprData,error:emprErr}=await _sb.from('empresas').insert([{
+          id:empresaId,
+          nome:empresa,
+          cnpj:cnpj||null,
+          criado_em:new Date().toISOString()
+        }]).select().single();
+        
+        if(!emprErr){
+          // Criar usuário no Supabase
+          var {data:userDataErr}=await _sb.from('usuarios').insert([{
+            id:userId,
+            empresa_id:empresaId,
+            nome:nome,
+            email:email,
+            pwd:pwdHash,
+            role:'adm',
+            ativo:true,
+            criado_em:new Date().toISOString()
+          }]).select().single();
+          
+          console.log('[Fluxy/Signup] Sincronizado com Supabase');
+        }
+      } catch(syncErr){
+        console.warn('[Fluxy/Signup] Erro ao sincronizar com Supabase:',syncErr.message);
+        // Continua anyway — dados estão no localStorage
+      }
+    }
+    
+    // 5. Auto-login
+    SESS={userId:userId,nome:nome,email:email,role:'adm',empresaId:empresaId,plano:'basico'};
+    APP_STATE.session=SESS;
+    APP_STATE.set('auth.logged',true);
+    APP_STATE.set('auth.role','adm');
+    APP_STATE.set('auth.user',nome);
+    stor_set(KEYS.sess,SESS);
+    
+    // 6. Mostrar app e ir para onboarding
+    showApp();
+    go('onboarding');
+    
+    console.log('[Fluxy/Signup] ✅ Signup completo. Auto-login e onboarding iniciados.');
+    
+  } catch(e) {
+    console.error('[Fluxy/Signup] Erro fatal:',e);
+    var err=document.getElementById('su-err');
+    if(err){ err.textContent='Erro ao criar conta. Tente novamente.'; err.style.display='block'; }
+  }
+}
+
 // ── Safe localStorage wrapper with quota protection ───────────────────────
+
 function stor_get_safe(key){
   try{ return stor_get(key); }catch(e){ console.error('[Fluxy] stor_get error:',key,e); return null; }
 }
@@ -4655,7 +4781,8 @@ function go(v){
   try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
   try {
-  if(!SESS){ return; }
+  // Permitir acesso a signup e login sem autenticação
+  if(!SESS && v!=='signup' && v!=='reset-pwd'){ return; }
   // Permission checks
   if((v==='usuarios'||v==='notas') && !isAdm()){ toast('Sem permissão.'); return; }
   if(v==='rotas'&&!isAdm()&&!isGer()&&!isEntr()){ toast('Sem permissão.'); return; }
@@ -4699,7 +4826,7 @@ function go(v){
     'pedidos':'Pedidos','meus-clientes':'Minha Rota','produtos':'Produtos','entregas':'Entregas',
     'relatorios':'Relatórios','comissoes':'Comissões','notas':'Notas Fiscais','gerente':'Painel Gerente','cobranças':'Cobranças','historico':'Histórico',
     'usuarios':'Usuários','rotas':'Rotas','perfil':'Meu Perfil',
-    'suporte':'Suporte','configuracoes':'Configurações','notificacoes':'Notificações','onboarding':'Primeiros Passos'
+    'suporte':'Suporte','configuracoes':'Configurações','notificacoes':'Notificações','onboarding':'Primeiros Passos','signup':'Criar Conta'
   };
   document.getElementById('pg-title').textContent = titles[v] || v;
   _flog('nav','→ '+v+' (token:'+CURRENT_VIEW_TOKEN+')');
@@ -4734,7 +4861,8 @@ function go(v){
       'financeiro':renderFinanceiro,
       'metas':renderMetas,
       'catalogo':renderCatalogo,
-      'ranking':renderRanking
+      'ranking':renderRanking,
+      'signup':renderSignup
     };
     if(_renderMap[v]){
       // rAF token check: abort if user already navigated away
@@ -4851,7 +4979,7 @@ function closeMob(){
   document.body.style.overflow='';
 }
 
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════������═══════════
 // UTILS
 // ═══════════════════════════════════════════════════════════
 function fmt(v){
@@ -6580,7 +6708,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
       if(nfApproved) bw.appendChild(mkb('📲 Nota','btn-gr btn-sm',function(){shareNota(pid);}));
     }
 
-    // ── ADM-only: Cancel / Status / Delete ────────────────────────
+    // ── ADM-only: Cancel / Status / Delete ────────��───────────────
     if(isAdm()){
       if(!pCancelled) bw.appendChild(mkb('❌ Cancelar','btn-r btn-sm',function(){cancelPed(pid);}));
       else bw.appendChild(mkb('🔄 Reativar','btn-y btn-sm',function(){chgStatus(pid);}));
@@ -6930,7 +7058,7 @@ function emitirNF(pedId){
     +'</div>'
     +'<div class="modal-foot">'
       +'<button class="btn btn-g" onclick="closeModal()">Fechar</button>'
-      +'<button class="btn btn-p" onclick="copiarXmlNF()">📋 Copiar XML</button>'
+      +'<button class="btn btn-p" onclick="copiarXmlNF()">���� Copiar XML</button>'
     +'</div>';
   openModal(html);
   toast('🧾 NF '+nfNum+' gerada!');
@@ -8229,7 +8357,7 @@ function exportRelPDF(){
   var periodoLabel={hoje:'Hoje',semana:'Últimos 7 dias',mes:'Este mês',tudo:'Todo o período'}[relPeriod]||relPeriod;
   var now=new Date().toISOString();
 
-  // ── Build products table data ────────────────────────────────────────────
+  // ── Build products table data ───────────────��────────────────────────────
   var prodMapa={};
   for(var i=0;i<aprovados.length;i++){
     var itens=aprovados[i].itens||[];
@@ -9188,7 +9316,7 @@ function renderNotas(){
           +'<div class="fs12 t1">'+fmtD(p.criadoEm)+'</div>'
         +'</div>'
       +'</div>'
-      +(p.nfChave?'<div style="font-size:9px;font-family:JetBrains Mono,monospace;color:var(--t3);padding:5px 8px;background:var(--s2);border-radius:6px;margin-bottom:8px;word-break:break-all">🔑 '+p.nfChave.replace(/(.{4})/g,"$1 ").trim()+'</div>':'')
+      +(p.nfChave?'<div style="font-size:9px;font-family:JetBrains Mono,monospace;color:var(--t3);padding:5px 8px;background:var(--s2);border-radius:6px;margin-bottom:8px;word-break:break-all">�� '+p.nfChave.replace(/(.{4})/g,"$1 ").trim()+'</div>':'')
       +(p.nfEmitidaEm?'<div class="fs11 t3 mb8">Emitida em: '+fmtDT(p.nfEmitidaEm)+'</div>':'')
       +'<div class="row gap6" style="flex-wrap:wrap" id="nf-btns-'+p.id+'"></div>';
 
@@ -11052,7 +11180,7 @@ function gerRecusarPagamentoOk(cobrId){
   closeModal();
   applyRoleNav();
   safeRender('cobranças',renderCobr);
-  toast('❌ Confirmação recusada. Cobrança voltou para pendente.','ok');
+  toast('❌ Confirma��ão recusada. Cobrança voltou para pendente.','ok');
 }
 
 function confirmarPago(cobrId){
@@ -11186,7 +11314,7 @@ function clearHist(){
   toast('🗑️ Histórico limpo.');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ════════════════════════════════��══════════════════════════
 // USUÁRIOS
 // ════════════════════════════════════════��═════���════════════
 var usrTab='all';
@@ -12309,7 +12437,7 @@ function openRotaMaps(rotaId){
     var addr=cli&&cli.endereco?cli.endereco:'';
     if(addr) addresses.push(encodeURIComponent(addr));
   }
-  if(!addresses.length){ toast('Nenhum endereço na rota.','err'); return; }
+  if(!addresses.length){ toast('Nenhum endere��o na rota.','err'); return; }
   var url='https://www.google.com/maps/dir/'+addresses.join('/');
   window.open(url,'_blank');
   toast('🗺️ Abrindo Google Maps...','ok');
@@ -13113,7 +13241,7 @@ function saveEditPedFull(){
 // Keep old saveEditPed for backward compat (any cached onclick still works)
 function saveEditPed(id,nItems){ _FLUXI_UI.ep.id=id; saveEditPedFull(); }
 
-// ── Meus Clientes / Rota ─────────────────────────────────────────────────
+// ── Meus Clientes / Rota ───────────��─────────────────────────────────────
 var mcDay='todos';
 var mcSem=false;
 
@@ -13292,7 +13420,7 @@ if(SESS){
 }
 
 
-// ═══════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════���═
 // PWA — SERVICE WORKER + INSTALL PROMPT
 // ═══════════════════════════════════════════════════════════════
 var _pwaPrompt=null;
@@ -13374,7 +13502,7 @@ function pwaInstall(){
   });
 }
 
-// ── Wire up buttons ──────────────────────────────────────────────
+// ── Wire up buttons ────────���──���──────────────────────────────────
 document.addEventListener('DOMContentLoaded',function(){
   var installBtn=document.getElementById('pwa-install-btn');
   var dismissBtn=document.getElementById('pwa-dismiss-btn');
@@ -13591,7 +13719,7 @@ window.addEventListener('error', function(e){
   }catch(_){}
 }, true);
 
-// ── Modal leak guard — ensure modal can always be closed ─────────────
+// ── Modal leak guard — ensure modal can always be closed ────���────────
 document.addEventListener('keydown',function(e){
   if((e.key==='Escape'||e.keyCode===27)&&document.getElementById('modal-bg')&&
      document.getElementById('modal-bg').className==='on'){
