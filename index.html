@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════�����═════════════════════════════
+/* ═════════════�������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -782,7 +782,7 @@ tr:last-child td { border-bottom:none }
 }
 
 
-/* ══���═���══════════════════════════════════════
+/* ���═���═���══════════════════════════════════════
    PERFORMANCE
 ═══════════════════════════════════════════ */
 /* GPU compositing layer for scroll container */
@@ -2245,6 +2245,184 @@ function uploadEmpresaLogo(inp){
   reader.readAsDataURL(file);
 }
 // ── Empresa document helpers ──────────────────────────────────
+
+// ── Supabase: Synchronization for Pedidos (Etapa 5) ───────────────
+// Todas as operações respeitam empresa_id (RLS) e possuem fallback local
+
+function _pedidoToSb(pedObj){
+  // Converte objeto local (camelCase) → formato Supabase (snake_case + empresa_id)
+  if(!pedObj || !SESS) return null;
+  return {
+    empresa_id:   SESS.empresaId,
+    numero:       pedObj.id || '',
+    cliente_id:   pedObj.cliId || '',
+    cliente_nome: pedObj.cliNome || '',
+    vendedor_id:  pedObj.vendId || '',
+    status:       pedObj.status || 'rascunho',
+    subtotal:     pedObj.sub || 0,
+    desconto:     pedObj.disc || 0,
+    total:        pedObj.total || 0,
+    observacoes:  pedObj.obs || '',
+    pagamento:    pedObj.pag || 'Dinheiro',
+    nf_numero:    pedObj.nfNumero || '',
+    nf_status:    pedObj.nfStatus || null,
+    comissao:     pedObj.commVal || 0,
+    solicitar_nf: pedObj.solicitarNF || false,
+    deleted:      pedObj.deleted || false,
+    criado_em:    pedObj.criadoEm || new Date().toISOString()
+  };
+}
+
+function _pedidoFromSb(row){
+  // Converte linha Supabase (snake_case) → formato local (camelCase)
+  if(!row) return null;
+  return {
+    id:           row.numero || '',
+    cliId:        row.cliente_id || '',
+    cliNome:      row.cliente_nome || '',
+    vendId:       row.vendedor_id || '',
+    status:       row.status || 'rascunho',
+    sub:          row.subtotal || 0,
+    disc:         row.desconto || 0,
+    total:        row.total || 0,
+    obs:          row.observacoes || '',
+    pag:          row.pagamento || 'Dinheiro',
+    nfNumero:     row.nf_numero || '',
+    nfStatus:     row.nf_status || null,
+    commVal:      row.comissao || 0,
+    solicitarNF:  row.solicitar_nf || false,
+    deleted:      row.deleted || false,
+    criadoEm:     row.criado_em
+  };
+}
+
+function _pedidoItemToSb(itemObj, pedidoId){
+  // Converte item local → Supabase
+  if(!itemObj || !SESS) return null;
+  return {
+    empresa_id:     SESS.empresaId,
+    pedido_id:      pedidoId || '',
+    produto_id:     itemObj.prodId || '',
+    produto_nome:   itemObj.prodNome || '',
+    quantidade:     itemObj.qty || 0,
+    preco_unitario: itemObj.preco || 0,
+    desconto_item:  itemObj.descontoItem || 0,
+    total_item:     (itemObj.preco * itemObj.qty) - (itemObj.descontoItem || 0)
+  };
+}
+
+function _pedidoItemFromSb(row){
+  // Converte item Supabase → local
+  if(!row) return null;
+  return {
+    prodId:        row.produto_id || '',
+    prodNome:      row.produto_nome || '',
+    qty:           row.quantidade || 0,
+    preco:         row.preco_unitario || 0,
+    descontoItem:  row.desconto_item || 0
+  };
+}
+
+async function loadPedidosFromSb(){
+  // Carrega pedidos da empresa no Supabase e popula o cache localStorage
+  // Nota: itens são carregados separadamente via pedido_itens table
+  if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  try {
+    var { data, error } = await _sb
+      .from('pedidos')
+      .select('*')
+      .eq('empresa_id', SESS.empresaId)
+      .eq('deleted', false)
+      .order('criado_em', { ascending: false });
+    
+    if(error) {
+      console.log('[Fluxy/PED] RLS ou erro ao carregar pedidos:', error.message);
+      return;
+    }
+    
+    var peds = (data || []).map(function(row){ return _pedidoFromSb(row); });
+    
+    // Para cada pedido, carregar seus itens
+    for(var p=0; p<peds.length; p++){
+      var { data: itens, error: itemsErr } = await _sb
+        .from('pedido_itens')
+        .select('*')
+        .eq('pedido_id', peds[p].id)
+        .eq('empresa_id', SESS.empresaId);
+      
+      if(!itemsErr && itens){
+        peds[p].itens = itens.map(function(row){ return _pedidoItemFromSb(row); });
+      }
+    }
+    
+    stor_set(KEYS.peds, peds);
+    console.log('[Fluxy/PED] '+peds.length+' pedidos carregados do Supabase');
+  } catch(e) {
+    console.error('[Fluxy/PED] Erro ao loadPedidosFromSb:', e.message);
+  }
+}
+
+async function _pedidoUpsertSb(pedObj){
+  // Insert ou update de pedido + itens no Supabase (async)
+  if(!CLOUD_ENABLED || !_sb || !SESS) return null;
+  var sbObj = _pedidoToSb(pedObj);
+  if(!sbObj) return null;
+  
+  try {
+    // Upsert pedido (cabeçalho)
+    var { data: pedData, error: pedErr } = pedObj.id && pedObj.id.startsWith('PED')
+      ? await _sb
+          .from('pedidos')
+          .update(sbObj)
+          .eq('numero', pedObj.id)
+          .eq('empresa_id', SESS.empresaId)
+          .select()
+          .single()
+      : await _sb
+          .from('pedidos')
+          .insert([{ ...sbObj }])
+          .select()
+          .single();
+    
+    if(pedErr) {
+      console.error('[Fluxy/PED] Erro ao upsert pedido:', pedErr.message);
+      return null;
+    }
+    
+    // Sincronizar itens
+    if(pedData && pedObj.itens && pedObj.itens.length > 0){
+      for(var i=0; i<pedObj.itens.length; i++){
+        var itemSb = _pedidoItemToSb(pedObj.itens[i], pedData.id);
+        await _sb
+          .from('pedido_itens')
+          .upsert([{ ...itemSb, pedido_id: pedData.id }])
+          .eq('empresa_id', SESS.empresaId);
+      }
+    }
+    
+    console.log('[Fluxy/PED] Pedido '+pedObj.id+' salvo no Supabase com '+((pedObj.itens||[]).length)+' itens');
+    return pedData;
+  } catch(e) {
+    console.error('[Fluxy/PED] Erro inesperado em _pedidoUpsertSb:', e.message);
+    return null;
+  }
+}
+
+async function _pedidoDeleteSb(id){
+  // Soft delete (deleted=true) no Supabase
+  if(!CLOUD_ENABLED || !_sb || !SESS || !id) return;
+  try {
+    await _sb
+      .from('pedidos')
+      .update({ deleted: true })
+      .eq('numero', id)
+      .eq('empresa_id', SESS.empresaId);
+    
+    console.log('[Fluxy/PED] Pedido '+id+' marcado como deletado no Supabase');
+  } catch(e) {
+    console.error('[Fluxy/PED] Erro inesperado em _pedidoDeleteSb:', e.message);
+  }
+}
 
 function getPeds(includeDeleted){
   var all=stor_get(KEYS.peds)||[];
@@ -3737,7 +3915,10 @@ function syncCloud(key, data){
         // Carrega produtos da empresa no boot (Etapa 4)
         loadProdsFromSb();
         break;
-      // case 'peds': loadPedsFromSb(); break; // Etapa 5
+      case 'peds':
+        // Carrega pedidos da empresa no boot (Etapa 5)
+        loadPedidosFromSb();
+        break;
       default:
         break;
     }
@@ -5790,6 +5971,8 @@ function nvFinalizar(){
   };
   peds.push(ped);
   savePeds(peds);
+  // Sincroniza com Supabase se habilitado (async, sem bloquear UI)
+  if(CLOUD_ENABLED) _pedidoUpsertSb(ped).catch(function(e){ console.error('[Fluxy/PED] erro em _pedidoUpsertSb:', e); });
   // Baixa automática de estoque ao criar pedido aprovado
   try{ estBaixaPedido(ped); }catch(e){ console.warn('[Fluxy] estBaixa:',e); }
   logHist('Pedido confirmado',id+' · '+NV.cliNome+' · '+fmt(total)+' · comissão: '+fmt(commVal)+(NV.obs?' · '+NV.obs:''));
@@ -5799,7 +5982,7 @@ function nvFinalizar(){
   busyUnlock('nvFinalizar');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ════════��══════════════════════════════════════════════════
 // PEDIDOS
 // ═══════════════════════════════════════════════════════════
 var pedFil = 'todos';
@@ -6673,6 +6856,8 @@ function delPedConfirm(id){
   peds[idx].deletedBy=SESS.nome||SESS.userId;
   if(motivo) peds[idx].deletedMotivo=motivo;
   savePeds(peds);
+  // Sincroniza exclusão com Supabase (async, sem bloquear)
+  if(CLOUD_ENABLED && id) _pedidoDeleteSb(id).catch(function(e){ console.error('[Fluxy/PED] erro em _pedidoDeleteSb:', e); });
 
   // Remove linked cobrança
   var cobrs=getCobr();
@@ -10704,7 +10889,7 @@ function clearHist(){
 
 // ═══════════════════════════════════════════════════════════
 // USUÁRIOS
-// ═══════════════════════════════════════════════════════════
+// ════════════════════════════════════════��══════════════════
 var usrTab='all';
 
 function setUsrTab(t){
@@ -12303,7 +12488,7 @@ function nvParaCli(cliId){
   go('nova-venda');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ══���════════════════════════════════════════════════════════
 // SEED (dados de exemplo)
 // ═══════════════════════════════════════════════════════════
 function seed(){
@@ -12335,10 +12520,11 @@ seed();
 loadSession();
 
 if(SESS){
-  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes, produtos)
+  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes, produtos, pedidos)
   if(CLOUD_ENABLED) {
     syncCloud('clis');
     syncCloud('prods');
+    syncCloud('peds');
   }
   showApp();
 } else {
