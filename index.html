@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════���═�������═�����������������═════════════════════════════
+/* ═════════�����═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +577,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-═══════════════════════════════════════���═���═ */
+══════════════════════════════��════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -1135,7 +1135,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ───���─────���─���─���─────────���───── */
+/* ─�� General mobile responsiveness ───���─────���─���─���─────────���───── */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -4387,7 +4387,7 @@ function clearAllTimers(){
 
 // ════════════════════════════════════════════════════════════════
 // CLEANUP ENGINE — prevent listener / timer / observer leaks
-// ══════════════════════════════════════════���═════════════════════
+// ══════════════════════════════════════════���════════��════════════
 var _cleanups={};
 function registerCleanup(viewId, fn){
   if(!_cleanups[viewId]) _cleanups[viewId]=[];
@@ -4506,6 +4506,7 @@ function isValidCNPJ(cnpj){
 
 // Renderizar tela de signup
 function renderSignup(){
+  console.log('[DEBUG] renderSignup() CALLED');
   var html='<div class="pg"><div class="pg-header"><h1>Criar Conta</h1><p>Crie sua empresa e comece agora</p></div><div class="form-container" style="max-width:400px;margin:40px auto">';
   
   html+='<div class="field"><label>Nome da Empresa *</label><input id="su-empresa" type="text" placeholder="Sua Empresa LTDA" maxlength="100"></div>';
@@ -4981,7 +4982,7 @@ function closeMob(){
 
 // ══════════════════════════════════════════════������═══════════
 // UTILS
-// ═══════════════════════════════════════════════════════════
+// ═══════════��═══════════════════════════════════════════════
 function fmt(v){
   var n = parseFloat(v)||0;
   return 'R$ '+n.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
@@ -13502,7 +13503,7 @@ function pwaInstall(){
   });
 }
 
-// ── Wire up buttons ────────���──���──────────────────────────────────
+// ── Wire up buttons ────────���──���───────────────────���──────────────
 document.addEventListener('DOMContentLoaded',function(){
   var installBtn=document.getElementById('pwa-install-btn');
   var dismissBtn=document.getElementById('pwa-dismiss-btn');
