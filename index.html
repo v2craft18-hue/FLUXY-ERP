@@ -4807,6 +4807,7 @@ function go(v){
   // Show target view
   var el = document.getElementById('v-'+v);
   if(!el){ toast('Tela não encontrada: '+v); return; }
+  console.log('[DEBUG] Found view v-'+v+', adding class "on"');
   el.className = 'view on';
 
   // scrollTop reset happens AFTER render so the full content height is known
