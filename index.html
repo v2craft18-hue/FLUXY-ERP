@@ -4872,6 +4872,7 @@ function go(v){
         requestAnimationFrame(function(){
           console.log('[RAF] fired for',key,'tok=',tok,'CURRENT=',CURRENT_VIEW_TOKEN,'match=',tok===CURRENT_VIEW_TOKEN);
           if(tok !== CURRENT_VIEW_TOKEN){ console.log('[RAF] ABORTED stale token',key); return; } // stale render — abort
+          console.log('[RENDER] Calling safeRender for',key);
           safeRender(key, fn);
         });
       })(_viewToken, _renderMap[v], v);
