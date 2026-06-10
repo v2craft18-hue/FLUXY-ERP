@@ -4506,7 +4506,6 @@ function isValidCNPJ(cnpj){
 
 // Renderizar tela de signup
 function renderSignup(){
-  console.log('[v0] renderSignup() called');
   var html='<div class="pg"><div class="pg-header"><h1>Criar Conta</h1><p>Crie sua empresa e comece agora</p></div><div class="form-container" style="max-width:400px;margin:40px auto">';
   
   html+='<div class="field"><label>Nome da Empresa *</label><input id="su-empresa" type="text" placeholder="Sua Empresa LTDA" maxlength="100"></div>';
@@ -4778,7 +4777,6 @@ function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboa
 
 function go(v){
   console.log('[GO] called with v=',v,'SESS=',SESS?SESS.role:'null','currentView=',currentView);
-  console.log('[v0] go() chamada: v='+v+', SESS='+(SESS?SESS.role:'null')+', currentView='+currentView);
   clearMemo();
   try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
