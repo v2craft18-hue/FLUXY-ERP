@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════���������═════════════════════════════
+/* ═════════════�����������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -1135,7 +1135,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ───────────────────────���───── */
+/* ── General mobile responsiveness ─────────────���─────────���───── */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -2242,7 +2242,7 @@ function getCobr(includeDeleted){
 }
 function saveCobr(v){ stor_set(KEYS.cobr,v); }
 
-// ════════════════════════════════════════════════════════════════
+// ═══════════════���════════════════════════════════════════════════
 // SAAS — multi-empresa storage + helpers
 // ════════════════════════════════════════════════════════════════
 function getEmpresaId(){ return (SESS&&SESS.empresaId)||'default'; }
@@ -4055,6 +4055,10 @@ function syncCloud(key, data){
       case 'cobr':
         // Carrega cobranças da empresa no boot (Etapa 6)
         loadCobrFromSb();
+        break;
+      case 'rotas':
+        // Carrega rotas da empresa no boot (Etapa 7A)
+        loadRotasFromSb();
         break;
       default:
         break;
@@ -11416,6 +11420,120 @@ function rotaSetPos(pedId, newIdx){
 // ════════════════════════════════════════════════════════════════
 // ROTAS — storage + helpers
 // ════════════════════════════════════════════════════════════════
+// ── Supabase: Synchronization for Rotas (Etapa 7A) ───────────────
+// Todas as operações respeitam empresa_id (RLS) e possuem fallback local
+
+function _rotaToSb(rotaObj){
+  // Converte objeto local (camelCase) → formato Supabase (snake_case + empresa_id)
+  if(!rotaObj || !SESS) return null;
+  return {
+    empresa_id:    SESS.empresaId,
+    numero:        rotaObj.id || '',
+    nome:          rotaObj.nome || '',
+    entregador_id: rotaObj.entregadorId || '',
+    status:        rotaObj.status || 'aberta',
+    data:          rotaObj.data || new Date().toISOString().slice(0,10),
+    obs:           rotaObj.obs || '',
+    ped_ids:       JSON.stringify(rotaObj.pedIds || []),
+    deleted:       rotaObj.deleted || false,
+    criado_em:     rotaObj.criadoEm || new Date().toISOString()
+  };
+}
+
+function _rotaFromSb(row){
+  // Converte linha Supabase (snake_case) → formato local (camelCase)
+  if(!row) return null;
+  return {
+    id:            row.numero || '',
+    nome:          row.nome || '',
+    entregadorId:  row.entregador_id || '',
+    status:        row.status || 'aberta',
+    data:          row.data || new Date().toISOString().slice(0,10),
+    obs:           row.obs || '',
+    pedIds:        row.ped_ids ? JSON.parse(row.ped_ids) : [],
+    deleted:       row.deleted || false,
+    criadoEm:      row.criado_em
+  };
+}
+
+async function loadRotasFromSb(){
+  // Carrega rotas da empresa no Supabase e popula o cache localStorage
+  if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  try {
+    var { data, error } = await _sb
+      .from('rotas')
+      .select('*')
+      .eq('empresa_id', SESS.empresaId)
+      .eq('deleted', false)
+      .order('criado_em', { ascending: false });
+    
+    if(error) {
+      console.log('[Fluxy/ROTA] RLS ou erro ao carregar rotas:', error.message);
+      return;
+    }
+    
+    var rotas = (data || []).map(function(row){ return _rotaFromSb(row); });
+    stor_set(KEYS.rotas, rotas);
+    console.log('[Fluxy/ROTA] '+rotas.length+' rotas carregadas do Supabase');
+  } catch(e) {
+    console.error('[Fluxy/ROTA] Erro ao loadRotasFromSb:', e.message);
+  }
+}
+
+async function _rotaUpsertSb(rotaObj){
+  // Insert ou update de rota no Supabase (async)
+  if(!CLOUD_ENABLED || !_sb || !SESS) return null;
+  var sbObj = _rotaToSb(rotaObj);
+  if(!sbObj) return null;
+  
+  try {
+    // Upsert rota
+    var { data, error } = rotaObj.id && rotaObj.id.startsWith('ROTA')
+      ? await _sb
+          .from('rotas')
+          .update(sbObj)
+          .eq('numero', rotaObj.id)
+          .eq('empresa_id', SESS.empresaId)
+          .select()
+          .single()
+      : await _sb
+          .from('rotas')
+          .insert([{ ...sbObj }])
+          .select()
+          .single();
+    
+    if(error) {
+      console.error('[Fluxy/ROTA] Erro ao upsert rota:', error.message);
+      return null;
+    }
+    console.log('[Fluxy/ROTA] Rota '+rotaObj.id+' salva no Supabase');
+    return data;
+  } catch(e) {
+    console.error('[Fluxy/ROTA] Erro inesperado em _rotaUpsertSb:', e.message);
+    return null;
+  }
+}
+
+async function _rotaDeleteSb(id){
+  // Soft delete (deleted=true) no Supabase
+  if(!CLOUD_ENABLED || !_sb || !SESS || !id) return;
+  try {
+    var { error } = await _sb
+      .from('rotas')
+      .update({ deleted: true })
+      .eq('numero', id)
+      .eq('empresa_id', SESS.empresaId);
+    
+    if(error) {
+      console.error('[Fluxy/ROTA] Erro ao deletar rota:', error.message);
+      return;
+    }
+    console.log('[Fluxy/ROTA] Rota '+id+' marcada como deletada no Supabase');
+  } catch(e) {
+    console.error('[Fluxy/ROTA] Erro inesperado em _rotaDeleteSb:', e.message);
+  }
+}
+
 function getRotas(){ return stor_get(KEYS.rotas) || []; }
 function saveRotas(arr){ stor_set(KEYS.rotas, arr); }
 
@@ -11510,6 +11628,9 @@ function saveRotaModal(editId){
     rs.push(obj);
   }
   saveRotas(rs);
+  // Sincroniza com Supabase se habilitado (async, sem bloquear UI)
+  if(CLOUD_ENABLED && editId) _rotaUpsertSb(obj).catch(function(e){ console.error('[Fluxy/ROTA] erro em _rotaUpsertSb:', e); });
+  if(CLOUD_ENABLED && !editId) _rotaUpsertSb(obj).catch(function(e){ console.error('[Fluxy/ROTA] erro em _rotaUpsertSb:', e); });
   logHist((editId?'Editou':'Criou')+' rota',obj.id+' '+obj.nome);
   closeModal();
   safeRender('rotas',renderRotasMgmt);
@@ -11520,8 +11641,16 @@ function delRota(id){
   if(!isAdm()&&!isGer()){ toast('Sem permissão.','err'); return; }
   if(!confirm('Excluir rota? Os pedidos não serão afetados.')) return;
   var rs=getRotas();
-  rs=rs.filter(function(r){return r.id!==id;});
+  var rota=null;
+  for(var i=0;i<rs.length;i++) if(rs[i].id===id){
+    rs[i].deleted=true;
+    rs[i].deletedAt=new Date().toISOString();
+    rota=rs[i];
+    break;
+  }
   saveRotas(rs);
+  // Sincroniza exclusão com Supabase (async, sem bloquear)
+  if(CLOUD_ENABLED && id) _rotaDeleteSb(id).catch(function(e){ console.error('[Fluxy/ROTA] erro em _rotaDeleteSb:', e); });
   logHist('Excluiu rota',id);
   safeRender('rotas',renderRotasMgmt);
   toast('Rota excluída.','ok');
@@ -12659,12 +12788,13 @@ seed();
 loadSession();
 
 if(SESS){
-  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes, produtos, pedidos, cobranças)
+  // Carrega dados da nuvem quando disponível (Etapa 3+: clientes, produtos, pedidos, cobranças, rotas)
   if(CLOUD_ENABLED) {
     syncCloud('clis');
     syncCloud('prods');
     syncCloud('peds');
     syncCloud('cobr');
+    syncCloud('rotas');
   }
   showApp();
 } else {
@@ -12722,7 +12852,7 @@ function pwaActivateUpdate(){
   }
 }
 
-// ── Install Prompt ───────────────────────────────────────────────
+// ── Install Prompt ────────────────────────────────────────���──────
 window.addEventListener('beforeinstallprompt',function(e){
   e.preventDefault();
   _pwaPrompt=e;
