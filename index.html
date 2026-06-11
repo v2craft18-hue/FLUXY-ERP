@@ -1198,7 +1198,10 @@ select option {
   #topbar { display: none !important; }
 }
 </style>
-  
+
+<!-- ═══ Supabase SDK ═══ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
+
 </head>
 <body>
 
@@ -1666,7 +1669,7 @@ select option {
           <div id="rota-mgmt-list"></div>
         </div>
 
-        <!-- ── DELIVERY PANEL (all roles) ───────────────────────���──── -->
+        <!-- ── DELIVERY PANEL (all roles) ──────────────────���────���──── -->
         <div id="rota-delivery-panel">
 
         <!-- ADM: entregador selector -->
@@ -2681,7 +2684,7 @@ function _cliToSb(cliObj){
 }
 
 function _cliFromSb(row){
-  // Converte linha Supabase (snake_case) → formato local (camelCase)
+  // Converte linha Supabase (snake_case) �� formato local (camelCase)
   if(!row) return null;
   return {
     id:           row.id,
@@ -4166,8 +4169,12 @@ function enableCloudSync(provider, config){
     console.log('[Fluxy] Firebase ready (SDK not loaded — add <script src=firebase.js> to index.html)');
   }
   if(config&&config.url&&provider==='supabase'){
-    // window.supabase = supabase.createClient(config.url, config.key);
-    console.log('[Fluxy] Supabase ready (SDK not loaded — add <script src=supabase.js> to index.html)');
+    try {
+      window._sb = supabase.createClient(config.url, config.key);
+      console.log('[Fluxy] ✓ Supabase initialized - Cloud sync ready');
+    } catch(e) {
+      console.error('[Fluxy] ✗ Supabase init failed:', e.message);
+    }
   }
   toast(CLOUD_ENABLED?'☁️ Cloud sync ativado ('+provider+')':'Cloud sync desativado');
 }
@@ -5773,7 +5780,7 @@ function delCli(id){
   toast('🗑️ Cliente excluído.');
 }
 
-// ════════════════════════════════���══════════════════════════
+// ═════════════════════════��══════���══════════════════════════
 // PRODUTOS
 // ════════════════════════════��═════════════════��═══════════��
 function renderProd(){
@@ -10280,7 +10287,7 @@ var _supTab='faq'; // 'faq' | 'chamados' | 'sugest' | 'chat' | 'master'
 var _faqSearch='';
 
 
-// ══════════════════════════════════════════���═════════════════════
+// ═════════════════════════════���════════════���═════════════════════
 // SUPORTE — openNovoChamado, openNovaSugest, renderConfig, etc.
 // ════════════════════════════════════════════════════════════════
 
@@ -13428,6 +13435,21 @@ function seed(){
 // ═══════════════════════════════════════════════════════════
 var APP_VERSION = '2.1';
 console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().slice(0,10));
+
+// ═══ STAGE FINALE: ATIVAR SUPABASE EM PRODUÇÃO ═══
+// Inicializar Supabase com env vars
+if(typeof supabase !== 'undefined' && window.location.hostname !== 'localhost') {
+  var _sb = supabase.createClient(
+    'https://' + (window.location.hostname.split('.')[0] === 'fluxy' ? 'eusgmqrgdbjjsoizrxby' : 'eusgmqrgdbjjsoizrxby') + '.supabase.co',
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1c2dtcXJnZGJqanNvaXpyeGJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4NzU4OTksImV4cCI6MTc2NzQxMTg5OX0.YkZzqY2N88_-mfj8L3-3zVzWnBzTaYvuJ3kHGxBzO-A'
+  );
+  enableCloudSync('supabase', {
+    url: 'https://eusgmqrgdbjjsoizrxby.supabase.co',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1c2dtcXJnZGJqanNvaXpyeGJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4NzU4OTksImV4cCI6MTc2NzQxMTg5OX0.YkZzqY2N88_-mfj8L3-3zVzWnBzTaYvuJ3kHGxBzO-A'
+  });
+  console.log('[Fluxy] 🚀 PRODUÇÃO: Supabase ativado');
+}
+
 seedAdmin();
 seed();
 loadSession();
