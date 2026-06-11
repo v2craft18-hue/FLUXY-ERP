@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════�����═�������═�����������������═════════════════════════════
+/* ═════════�������═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +577,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-══════════════════════════════��════════���═���═ */
+══════════════════════════════����════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -3734,7 +3734,7 @@ function renderIntegracoes(){
     + '</div>'
     + '<div class="row gap8 mt8">'
     + '<button class="btn btn-p" onclick="_finSalvarIntegracao()">💾 Salvar</button>'
-    + '<button class="btn btn-g" onclick="_finTestarConexao()">🧪 Testar Conexão</button>'
+    + '<button class="btn btn-g" onclick="_finTestarConexao()">�� Testar Conexão</button>'
     + '</div></div>';
 }
 
@@ -4340,7 +4340,7 @@ fmtD=function(v){
 };
 function clearMemo(){ _memo={}; _fmtCache={}; _fmtDateCache={}; }
 
-// ── Managed timer registry — prevents orphan timers ─────────────────────
+// ── Managed timer registry ��� prevents orphan timers ─────────────────────
 var _timers={};
 function setTimer(key, fn, ms){
   if(_timers[key]) clearTimeout(_timers[key]);
@@ -4387,7 +4387,7 @@ function clearAllTimers(){
 
 // ════════════════════════════════════════════════════════════════
 // CLEANUP ENGINE — prevent listener / timer / observer leaks
-// ══════════════════════════════════════════���════════��════════════
+// ══════════════════════════════════════════���════��═══��════════════
 var _cleanups={};
 function registerCleanup(viewId, fn){
   if(!_cleanups[viewId]) _cleanups[viewId]=[];
@@ -4506,7 +4506,7 @@ function isValidCNPJ(cnpj){
 
 // Renderizar tela de signup
 function renderSignup(){
-  console.log('[DEBUG] renderSignup() CALLED');
+  console.log('[renderSignup] STEP 1: Called');
   var html='<div class="pg"><div class="pg-header"><h1>Criar Conta</h1><p>Crie sua empresa e comece agora</p></div><div class="form-container" style="max-width:400px;margin:40px auto">';
   
   html+='<div class="field"><label>Nome da Empresa *</label><input id="su-empresa" type="text" placeholder="Sua Empresa LTDA" maxlength="100"></div>';
@@ -4527,8 +4527,16 @@ function renderSignup(){
   
   html+='</div></div>';
   
+  console.log('[renderSignup] STEP 2: HTML built, length=',html.length);
   var el=document.getElementById('v-signup');
-  if(el) el.innerHTML=html;
+  console.log('[renderSignup] STEP 3: Element el=',el,'id match=',el?el.id:'none');
+  if(el) {
+    console.log('[renderSignup] STEP 4: Setting innerHTML');
+    el.innerHTML=html;
+    console.log('[renderSignup] STEP 5: innerHTML set, el.innerHTML.length=',el.innerHTML.length);
+  } else {
+    console.log('[renderSignup] ERROR: Element v-signup not found!');
+  }
 }
 
 // Validar formulário de signup
@@ -4777,13 +4785,15 @@ function throttle(fn,ms){
 function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboard'); } }
 
 function go(v){
-  console.log('[GO] called with v=',v,'SESS=',SESS?SESS.role:'null','currentView=',currentView);
+  console.log('[GO] STEP 1: called with v=',v,'SESS=',SESS?SESS.role:'null','currentView=',currentView);
   clearMemo();
   try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
+  console.log('[GO] STEP 2: _viewToken=',_viewToken,'CURRENT=',CURRENT_VIEW_TOKEN);
   try {
   // Permitir acesso a signup e login sem autenticação
-  if(!SESS && v!=='signup' && v!=='reset-pwd'){ return; }
+  if(!SESS && v!=='signup' && v!=='reset-pwd'){ console.log('[GO] ABORTED: no SESS and v!=signup'); return; }
+  console.log('[GO] STEP 3: permission check passed');
   // Permission checks
   if((v==='usuarios'||v==='notas') && !isAdm()){ toast('Sem permissão.'); return; }
   if(v==='rotas'&&!isAdm()&&!isGer()&&!isEntr()){ toast('Sem permissão.'); return; }
@@ -4800,15 +4810,28 @@ function go(v){
 
   // View switching — wrapped so DOM errors don't blank the app
   try {
+  console.log('[GO] STEP 4: Hiding all views');
   // Hide all views
   var views = document.querySelectorAll('.view');
-  for(var i=0;i<views.length;i++) views[i].className = 'view';
+  console.log('[GO] Found',views.length,'views to hide');
+  for(var i=0;i<views.length;i++) {
+    console.log('[GO]   - Hiding view',i,'current class=',views[i].className);
+    views[i].className = 'view';
+  }
 
+  console.log('[GO] STEP 5: Looking for v-'+v);
   // Show target view
   var el = document.getElementById('v-'+v);
-  if(!el){ toast('Tela não encontrada: '+v); return; }
-  console.log('[DEBUG] Found view v-'+v+', adding class "on"');
+  if(!el){ 
+    console.log('[GO] ERROR: Element v-'+v+' NOT FOUND'); 
+    toast('Tela não encontrada: '+v); 
+    return; 
+  }
+  console.log('[GO] STEP 6: Found v-'+v+', el=',el,'current class=',el.className);
+  console.log('[GO] STEP 7: Adding class "view on"');
   el.className = 'view on';
+  console.log('[GO] STEP 8: Class added, now el.className=',el.className);
+  console.log('[GO] STEP 9: Checking computed style display=',window.getComputedStyle(el).display);
 
   // scrollTop reset happens AFTER render so the full content height is known
   var _contentEl = document.getElementById('content');
@@ -4867,15 +4890,22 @@ function go(v){
       'signup':renderSignup
     };
     if(_renderMap[v]){
+      console.log('[GO] STEP 10: Render function exists for',v);
       // rAF token check: abort if user already navigated away
       (function(tok, fn, key){
+        console.log('[GO] STEP 11a: RAF wrapper called with tok=',tok,'key=',key);
         requestAnimationFrame(function(){
-          console.log('[RAF] fired for',key,'tok=',tok,'CURRENT=',CURRENT_VIEW_TOKEN,'match=',tok===CURRENT_VIEW_TOKEN);
-          if(tok !== CURRENT_VIEW_TOKEN){ console.log('[RAF] ABORTED stale token',key); return; } // stale render — abort
-          console.log('[RENDER] Calling safeRender for',key);
+          console.log('[GO] STEP 11b: RAF callback fired for',key,'tok=',tok,'CURRENT=',CURRENT_VIEW_TOKEN,'match=',tok===CURRENT_VIEW_TOKEN);
+          if(tok !== CURRENT_VIEW_TOKEN){ 
+            console.log('[GO] STEP 11c: RAF ABORTED - stale token'); 
+            return; 
+          }
+          console.log('[GO] STEP 12: Token OK, calling safeRender');
           safeRender(key, fn);
         });
       })(_viewToken, _renderMap[v], v);
+    } else {
+      console.log('[GO] WARNING: No render function for',v);
     }
     // Re-enable scroll after render — forces browser to recalculate scroll area
     if(_ce){
@@ -10852,7 +10882,7 @@ function renderCobr(){
   var valPend=kpis.valPend,valAtr=kpis.valAtr,valPago=kpis.valPago,valAguard=kpis.valAguard,valTotal=kpis.valTotal;
   var pct=kpis.pctPago;
   var kpEl=document.getElementById('cobr-kpis');
-  // ── KPI grid: always 4 cards (stable 2×2) ───────────────────────────
+  // ── KPI grid: always 4 cards (stable 2×2) ─────────────────────────��─
   if(kpEl) kpEl.innerHTML=''
     // Row 1: Total Geral | Pago
     +'<div class="kpi-card" style="border-top:2px solid #3B82F655">'
@@ -13878,7 +13908,7 @@ if(pwaIsInstalled()){
   if(_b) _b.style.display='none';
 }
 
-// ── Guard: protect SPA from @media print side-effects ────────────
+// ��─ Guard: protect SPA from @media print side-effects ────────────
 // Some Android browsers apply @media print to the parent when an
 // iframe or popup prints, triggering .view{display:none!important}
 // and blanking the app. We capture the active view before printing
