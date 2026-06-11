@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════�����������������═�������═�����������������═════════════════════════════
+/* ═══��═════�����������������═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -786,7 +786,7 @@ tr:last-child td { border-bottom:none }
    PERFORMANCE
 ═══════════════════════════════════════════ */
 /* GPU compositing layer for scroll container */
-#content { contain:style; }
+/* Removed contain:style due to layout collapse - prevents flex sizing */
 /* Reduce paint area on cards */
 
 /* Prevent text selection lag on interactive elements */
@@ -5772,7 +5772,7 @@ function delCli(id){
 
 // ═══════════════════════════════════════════════════════════
 // PRODUTOS
-// ══════════════════════════════════════════════════════════��
+// ══════════════════════════════════════════════��═══════════��
 function renderProd(){
   try {
   if(currentView!=='produtos') return;
@@ -7615,7 +7615,7 @@ function printPed(id){
       +'}catch(e){window.print();}'
     +'}'
     +'function compartilharWhats(){'
-      +'var txt=encodeURIComponent("Pedido '+p.id+' — '+p.cliNome+' — R$ '+total.toFixed(2)+'");'
+      +'var txt=encodeURIComponent("Pedido '+p.id+' ��� '+p.cliNome+' — R$ '+total.toFixed(2)+'");'
       +'window.open("https://wa.me/?text="+txt,"_blank");'
     +'}'
     +'<\/script>'
@@ -10894,7 +10894,7 @@ function renderCobr(){
       +'<div class="kpi-sub">'+mine.length+' cobrança'+(mine.length!==1?'s':'')+'</div>'
     +'</div>'
     +'<div class="kpi-card" style="border-top:2px solid #10B98155">'
-      +'<div class="kpi-label">✅ Recebido</div>'
+      +'<div class="kpi-label">�� Recebido</div>'
       +'<div class="kpi-value" style="color:#10B981;font-size:20px">'+fmt(valPago)+'</div>'
       +'<div class="kpi-sub">'+nPago+' pago'+(nPago!==1?'s':'')+'</div>'
     +'</div>'
@@ -11022,7 +11022,7 @@ function renderCobr(){
     if(cobr.fotoNota){
       var fotoBtn=document.createElement('button');
       fotoBtn.className='btn btn-g btn-sm'; fotoBtn.style.flex='1';
-      fotoBtn.innerHTML='🖼️ Ver Foto';
+      fotoBtn.innerHTML='🖼��� Ver Foto';
       fotoBtn.setAttribute('data-id',cobr.id);
       fotoBtn.onclick=function(){verFotoCobr(this.getAttribute('data-id'));};
       bw.appendChild(fotoBtn);
@@ -13400,7 +13400,7 @@ function nvParaCli(cliId){
 
 // ══���════════════════════════════════════════════════════════
 // SEED (dados de exemplo)
-// ══════════════════════════════════════════════��══���═════════
+// ═════════════════════════════════════��════════��══���═════════
 function seed(){
   if(!getProds().length){
     saveProds([
