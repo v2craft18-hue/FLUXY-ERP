@@ -577,7 +577,7 @@ td {
 tr:hover td { background:rgba(59,130,246,.05) }
 tr:last-child td { border-bottom:none }
 
-/* ═══════════════════════════════════════════
+/* ═══════════════════════════════════��═══════
    TABS
 ════════════��════════���══��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
@@ -1257,6 +1257,7 @@ select option {
     <div style="text-align:center;padding-top:16px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
       <button onclick="fixAccess()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">Problemas para acessar?</button>
       <button onclick="openResetPwd()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">🔑 Esqueci minha senha</button>
+    </div>
   </div>
 </div>
 
@@ -1665,7 +1666,7 @@ select option {
           <div id="rota-mgmt-list"></div>
         </div>
 
-        <!-- ── DELIVERY PANEL (all roles) ──────────────────────────── -->
+        <!-- ── DELIVERY PANEL (all roles) ───────────────────────���──── -->
         <div id="rota-delivery-panel">
 
         <!-- ADM: entregador selector -->
@@ -5772,7 +5773,7 @@ function delCli(id){
   toast('🗑️ Cliente excluído.');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ════════════════════════════════���══════════════════════════
 // PRODUTOS
 // ════════════════════════════��═════════════════��═══════════��
 function renderProd(){
@@ -6701,7 +6702,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
         }
       } else if(isVend()&&pObj.vendId===SESS.userId){
         if(!nfSolicitada&&nfApproved){
-          bw.appendChild(mkb('📨 Solicitar NF','btn-g btn-sm',function(){solicitarNF(pid);}));
+          bw.appendChild(mkb('��� Solicitar NF','btn-g btn-sm',function(){solicitarNF(pid);}));
         } else if(nfSolicitada&&!pObj.nfNumero){
           var nfPend=document.createElement('span');
           nfPend.style.cssText='font-size:11px;font-weight:700;color:#FCD34D;padding:4px 8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:6px';
@@ -7524,7 +7525,7 @@ function printPed(id){
           +'<table>'
             +'<thead><tr>'
               +'<th style="width:88px">Referência</th>'
-              +'<th>Descrição</th>'
+              +'<th>Descriç��o</th>'
               +'<th class="c" style="width:42px">UN</th>'
               +'<th class="c" style="width:42px">Qtd</th>'
               +'<th class="r" style="width:72px">Unit. R$</th>'
@@ -10083,7 +10084,7 @@ function gerCancel(pedId){
     +'<div class="field"><label>MOTIVO / OBSERVAÇÃO PARA O VENDEDOR</label><textarea id="ger-cancel-mot" placeholder="Ex: estoque insuficiente, valor incorreto..."></textarea></div>'
     +'<div class="modal-foot">'
       +'<button class="btn btn-g" onclick="closeModal()">Voltar</button>'
-      +'<button class="btn btn-r" data-id="'+pedId+'" onclick="gerCancelConfirm(this.dataset.id)">❌ Cancelar Pedido</button>'
+      +'<button class="btn btn-r" data-id="'+pedId+'" onclick="gerCancelConfirm(this.dataset.id)">�� Cancelar Pedido</button>'
     +'</div>');
 }
 
@@ -10279,7 +10280,7 @@ var _supTab='faq'; // 'faq' | 'chamados' | 'sugest' | 'chat' | 'master'
 var _faqSearch='';
 
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════���═════════════════════
 // SUPORTE — openNovoChamado, openNovaSugest, renderConfig, etc.
 // ════════════════════════════════════════════════════════════════
 
@@ -10555,7 +10556,7 @@ function renderSuporte(){
 
 function setSupTab(tab){ _supTab=tab; safeRender('suporte',renderSuporte); }
 
-// ── FAQ ───────────────────────��──────────────────────────────────
+// ── FAQ ──��────────────────────��──────────────────────────────────
 
 
 
