@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════�������������═�������═�����������������═════════════════════════════
+/* ═════════���������������═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -4663,14 +4663,14 @@ function submitSignup(){
     APP_STATE.set('auth.user',nome);
     stor_set(KEYS.sess,SESS);
     
-    // 6. Mostrar app e ir para onboarding
+    // 6. Mostrar app e ir para dashboard
     console.log('[v0-AUDIT] submitSignup() calling showApp()');
     showApp();
-    console.log('[v0-AUDIT] submitSignup() showApp() returned, now calling go(onboarding)');
-    go('onboarding');
-    console.log('[v0-AUDIT] submitSignup() go(onboarding) returned');
+    console.log('[v0-AUDIT] submitSignup() showApp() returned, now calling go(dashboard)');
+    go('dashboard');
+    console.log('[v0-AUDIT] submitSignup() go(dashboard) returned');
     
-    console.log('[Fluxy/Signup] ✅ Signup completo. Auto-login e onboarding iniciados.');
+    console.log('[Fluxy/Signup] ✅ Signup completo. Auto-login e dashboard iniciados.');
     
   } catch(e) {
     console.error('[Fluxy/Signup] Erro fatal:',e);
