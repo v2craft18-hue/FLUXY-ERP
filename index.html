@@ -1248,7 +1248,7 @@ select option {
     </button>
     <div style="text-align:center;margin-top:26px;margin-bottom:26px">
       <p style="font-size:13px;color:var(--t2);margin:0 0 12px 0">Não possui conta?</p>
-      <button class="btn btn-p" style="width:100%;justify-content:center;padding:11px;font-size:13px;border-radius:var(--r2);font-weight:600;background:var(--green);color:white;opacity:0.9" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'" onclick="go('signup')">
+      <button class="btn btn-p" style="width:100%;justify-content:center;padding:11px;font-size:13px;border-radius:var(--r2);font-weight:600;background:var(--green);color:white;opacity:0.9" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'" onclick="showSignup()">
         ✨ Criar Conta Grátis
       </button>
     </div>
@@ -4209,6 +4209,12 @@ function showApp(){
   setTimeout(fluxyLayoutDiag, 400);
 }
 
+function showSignup(){
+  document.getElementById('login-wrap').style.display = 'flex';
+  document.getElementById('app').className = 'visible';
+  go('signup');
+}
+
 function updateSidebar(){
   if(!SESS) return;
   document.getElementById('sb-nome').textContent = SESS.nome || '—';
@@ -4776,20 +4782,13 @@ function throttle(fn,ms){
 function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboard'); } }
 
 function go(v){
-  console.log('[v0] go() called with v=', v);
-  console.log('[v0] SESS=', SESS ? 'exists' : 'null', 'currentView=', currentView);
   clearMemo();
-  try{ runCleanup(currentView); }catch(e){ console.log('[v0] runCleanup error:', e.message); }
+  try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
-  console.log('[v0] _viewToken set to', _viewToken);
   try {
-  console.log('[v0] Inside try block, starting permission checks');
   // Permitir acesso a signup e login sem autenticação
-  if(!SESS && v!=='signup' && v!=='reset-pwd'){ 
-    console.log('[v0] No SESS and v!=signup, returning early');
-    return; 
-  }
-  console.log('[v0] Permission checks OK');
+  if(!SESS && v!=='signup' && v!=='reset-pwd'){ return; }
+  // Permission checks
   if((v==='usuarios'||v==='notas') && !isAdm()){ toast('Sem permissão.'); return; }
   if(v==='rotas'&&!isAdm()&&!isGer()&&!isEntr()){ toast('Sem permissão.'); return; }
   if(v==='configuracoes'&&!isAdm()){ toast('Sem permissão.','err'); return; }
@@ -4813,15 +4812,11 @@ function go(v){
 
   // ✓ VERIFY: View element lookup uses dynamic parameter 'v' (NOT hardcoded)
   var el = document.getElementById('v-'+v);
-  console.log('[v0] getElementById("v-'+v+'") returned:', el ? 'found' : 'NOT FOUND');
   if(!el){ 
-    console.log('[v0] ERROR: Element not found, showing toast');
     toast('Tela não encontrada: v-'+v); 
     return; 
   }
-  console.log('[v0] Before: el.className =', el.className);
   el.className = 'view on';
-  console.log('[v0] After: el.className =', el.className, 'computed display:', window.getComputedStyle(el).display);
 
   // scrollTop reset happens AFTER render so the full content height is known
   var _contentEl = document.getElementById('content');
