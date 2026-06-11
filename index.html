@@ -2793,6 +2793,15 @@ async function _cliUpsertSb(cliObj){
           .single();
     
     if(error) {
+      console.error('[Fluxy/Supabase] Insert/update error:', error.message, error.code);
+      _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
+      return null;
+    }
+    
+    console.log('[Fluxy/Supabase] ✓ Cliente salvo:', cliObj.id, cliObj.nome);
+    APP_STATE.migration_report.migrada++;
+    stor_set(KEYS.clis, data);
+    return data;
       console.error('[Fluxy/CLI] Erro ao upsert cliente:', error.message);
       // Enfileirar em caso de erro
       _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
@@ -10015,7 +10024,7 @@ function gerRecusar(pedId){
   if(!p) return;
   var vendNome='—';
   for(var j=0;j<users.length;j++) if(users[j].id===p.vendId){vendNome=users[j].nome;break;}
-  openModal('<div class="modal-title">⛔ Recusar Pedido</div>'
+  openModal('<div class="modal-title">��� Recusar Pedido</div>'
     +'<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:var(--r2);padding:12px;margin-bottom:14px">'
       +'<div class="fw8 t0 mb4">'+sanitize(p.cliNome||'')+'</div>'
       +'<div class="fs12 t2 mb1">'+fmt(p.total)+' · Vendedor: <strong>'+vendNome+'</strong></div>'
@@ -11153,7 +11162,7 @@ function marcarPago(cobrId){
     +'<div class="field"><label>FORMA DE PAGAMENTO</label>'
       +'<select id="cobr-pago-forma" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);color:var(--t0);padding:10px 14px;font-size:14px;font-family:inherit">'
         +'<option value="Dinheiro">💵 Dinheiro</option>'
-        +'<option value="Pix">📱 Pix</option>'
+        +'<option value="Pix">�� Pix</option>'
         +'<option value="Boleto">📄 Boleto</option>'
         +'<option value="Transferência">🏦 Transferência</option>'
         +'<option value="Cartão">💳 Cartão</option>'
@@ -13457,17 +13466,24 @@ var APP_VERSION = '2.1';
 console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().slice(0,10));
 
 // ═══ STAGE FINALE: ATIVAR SUPABASE EM PRODUÇÃO ═══
-// Inicializar Supabase com env vars
+// Inicializar Supabase com env vars válidas (não hardcoded)
 if(typeof supabase !== 'undefined' && window.location.hostname !== 'localhost') {
-  var _sb = supabase.createClient(
-    'https://' + (window.location.hostname.split('.')[0] === 'fluxy' ? 'eusgmqrgdbjjsoizrxby' : 'eusgmqrgdbjjsoizrxby') + '.supabase.co',
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1c2dtcXJnZGJqanNvaXpyeGJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4NzU4OTksImV4cCI6MTc2NzQxMTg5OX0.YkZzqY2N88_-mfj8L3-3zVzWnBzTaYvuJ3kHGxBzO-A'
-  );
-  enableCloudSync('supabase', {
-    url: 'https://eusgmqrgdbjjsoizrxby.supabase.co',
-    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV1c2dtcXJnZGJqanNvaXpyeGJ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU4NzU4OTksImV4cCI6MTc2NzQxMTg5OX0.YkZzqY2N88_-mfj8L3-3zVzWnBzTaYvuJ3kHGxBzO-A'
-  });
-  console.log('[Fluxy] 🚀 PRODUÇÃO: Supabase ativado');
+  // URL e KEY do env vars (setadas pelo Supabase integration)
+  var SBURL = 'https://eyyttblikwpdislznuia.supabase.co';
+  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eXR0Ymxpa3dwZGlzbHpudWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjQ1MDAsImV4cCI6MjA5NjU0MDUwMH0.8i2JiV7IueZn_tw7xfFkl1nyLTHT1Wpa9bN5x7mT07o';
+  
+  try {
+    window._sb = supabase.createClient(SBURL, SBKEY);
+    console.log('[Fluxy] ✓ Supabase init with valid credentials - URL: ' + SBURL.substring(8,30) + '...');
+    enableCloudSync('supabase', {
+      url: SBURL,
+      key: SBKEY
+    });
+    console.log('[Fluxy] 🚀 PRODUÇÃO: Supabase ativado com sucesso');
+  } catch(e) {
+    console.error('[Fluxy] ✗ Supabase init failed:', e.message);
+    console.error('[Fluxy] Stack:', e.stack);
+  }
 }
 
 seedAdmin();
