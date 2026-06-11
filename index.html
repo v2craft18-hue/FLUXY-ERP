@@ -4506,7 +4506,6 @@ function isValidCNPJ(cnpj){
 
 // Renderizar tela de signup
 function renderSignup(){
-  console.log('[renderSignup] STEP 1: Called');
   var html='<div class="pg"><div class="pg-header"><h1>Criar Conta</h1><p>Crie sua empresa e comece agora</p></div><div class="form-container" style="max-width:400px;margin:40px auto">';
   
   html+='<div class="field"><label>Nome da Empresa *</label><input id="su-empresa" type="text" placeholder="Sua Empresa LTDA" maxlength="100"></div>';
@@ -4527,17 +4526,8 @@ function renderSignup(){
   
   html+='</div></div>';
   
-  console.log('[renderSignup] STEP 2: HTML built, length=',html.length);
   var el=document.getElementById('v-signup');
-  console.log('[renderSignup] STEP 3: Element el=',el,'id match=',el?el.id:'none');
-  if(el) {
-    console.log('[renderSignup] STEP 4: Setting innerHTML');
-    el.innerHTML=html;
-    console.log('[renderSignup] STEP 5: innerHTML set, el.innerHTML.length=',el.innerHTML.length);
-    console.log('[renderSignup] STEP 6: Checking el.className=',el.className);
-  } else {
-    console.log('[renderSignup] ERROR: Element v-signup not found!');
-  }
+  if(el) el.innerHTML=html;
 }
 
 // Validar formulário de signup
@@ -4786,15 +4776,12 @@ function throttle(fn,ms){
 function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboard'); } }
 
 function go(v){
-  console.log('[GO] STEP 1: called with v=',v,'SESS=',SESS?SESS.role:'null','currentView=',currentView);
   clearMemo();
   try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
-  console.log('[GO] STEP 2: _viewToken=',_viewToken,'CURRENT=',CURRENT_VIEW_TOKEN);
   try {
   // Permitir acesso a signup e login sem autenticação
-  if(!SESS && v!=='signup' && v!=='reset-pwd'){ console.log('[GO] ABORTED: no SESS and v!=signup'); return; }
-  console.log('[GO] STEP 3: permission check passed');
+  if(!SESS && v!=='signup' && v!=='reset-pwd'){ return; }
   // Permission checks
   if((v==='usuarios'||v==='notas') && !isAdm()){ toast('Sem permissão.'); return; }
   if(v==='rotas'&&!isAdm()&&!isGer()&&!isEntr()){ toast('Sem permissão.'); return; }
@@ -4848,7 +4835,6 @@ function go(v){
   document.getElementById('pg-title').textContent = titles[v] || v;
   _flog('nav','→ '+v+' (token:'+CURRENT_VIEW_TOKEN+')');
   currentView = v;
-  console.log('[GO] currentView set to',v,'token=',_viewToken,'CURRENT=',CURRENT_VIEW_TOKEN);
   APP_STATE.ui.currentView = v;
   if(!APP_STATE.ui[v]||typeof APP_STATE.ui[v]!=='object') APP_STATE.ui[v]={};
   closeMob();
@@ -4882,7 +4868,6 @@ function go(v){
       'signup':renderSignup
     };
     if(_renderMap[v]){
-      console.log('[GO] STEP 10: Render function exists for',v);
       // rAF token check: abort if user already navigated away
       (function(tok, fn, key){
         requestAnimationFrame(function(){
