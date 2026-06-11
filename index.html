@@ -4777,13 +4777,19 @@ function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboa
 
 function go(v){
   console.log('[v0] go() called with v=', v);
+  console.log('[v0] SESS=', SESS ? 'exists' : 'null', 'currentView=', currentView);
   clearMemo();
-  try{ runCleanup(currentView); }catch(e){}
+  try{ runCleanup(currentView); }catch(e){ console.log('[v0] runCleanup error:', e.message); }
   var _viewToken = ++CURRENT_VIEW_TOKEN;
+  console.log('[v0] _viewToken set to', _viewToken);
   try {
+  console.log('[v0] Inside try block, starting permission checks');
   // Permitir acesso a signup e login sem autenticação
-  if(!SESS && v!=='signup' && v!=='reset-pwd'){ return; }
-  // Permission checks
+  if(!SESS && v!=='signup' && v!=='reset-pwd'){ 
+    console.log('[v0] No SESS and v!=signup, returning early');
+    return; 
+  }
+  console.log('[v0] Permission checks OK');
   if((v==='usuarios'||v==='notas') && !isAdm()){ toast('Sem permissão.'); return; }
   if(v==='rotas'&&!isAdm()&&!isGer()&&!isEntr()){ toast('Sem permissão.'); return; }
   if(v==='configuracoes'&&!isAdm()){ toast('Sem permissão.','err'); return; }
