@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═══��═════�����������������═�������═�����������������═════════════════════════════
+/* ═══���═════�����������������═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +577,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-═════════════════════���══��════�������════════���═���═ */
+════════════��════════���══��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -998,8 +998,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* ── Android WebView / APK Performance optimizations ─────────────────── */
 /* GPU layer for cards — promotes to compositor, avoids main-thread repaints */
 .card { contain: content; }
-.view { contain: style; }
-#sb   { contain: style; }
+.view { /* contain: style removed - breaks flex layout sizing for views */ }
+#sb   { /* contain: style removed - causes sidebar collapse on app.visible */ }
 /* Scrollable containers — own GPU layer + momentum scroll */
 #entr-list, #nf-list, #cobr-list, .ger-list,
 #ped-list, #cli-list, #prod-list, #comm-list,
@@ -1793,7 +1793,7 @@ window.FLUXI.ui=_FLUXI_UI;
 var EDIT_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in ms
 
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════���═════════════════════════════════════
 // FINANCIAL ENGINE — single source of truth for all KPI maths
 // ════════════════════════════════════════════════════════════════
 
@@ -4331,7 +4331,7 @@ function memo(key,fn){
   return _memo[key];
 }
 
-// ── Format memoization cache ──────────────────────────────────────────
+// ── Format memoization cache ─────────────────────────────────────���────
 var _fmtCache={};
 var _fmtDateCache={};
 var _origFmt=fmt;
@@ -5772,7 +5772,7 @@ function delCli(id){
 
 // ═══════════════════════════════════════════════════════════
 // PRODUTOS
-// ══════════════════════════════════════════════��═══════════��
+// ════════════════════════════��═════════════════��═══════════��
 function renderProd(){
   try {
   if(currentView!=='produtos') return;
@@ -8393,7 +8393,7 @@ function exportRelPDF(){
   var periodoLabel={hoje:'Hoje',semana:'Últimos 7 dias',mes:'Este mês',tudo:'Todo o período'}[relPeriod]||relPeriod;
   var now=new Date().toISOString();
 
-  // ── Build products table data ───────────────��────────────────────────────
+  // ── Build products table data ───────────────��──────────────────���─────────
   var prodMapa={};
   for(var i=0;i<aprovados.length;i++){
     var itens=aprovados[i].itens||[];
@@ -8743,7 +8743,7 @@ function exportCSV(){
 
 // ═══════════════════════════════════════════════════════════
 // COMISSÕES
-// ═══════════════════════════════════════════════════════════
+// ══════════���════════════════════════════════════════════════
 // ── Commission helpers ────────────────────────────────────────────────────
 function prodModalToggleComm(){
   var sel=document.getElementById('pp-comm-type');
