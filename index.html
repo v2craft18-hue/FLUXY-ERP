@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════���������═�������═�����������������═════════════════════════════
+/* ═════════�����������═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +577,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-═════════════════════════════�������════════���═���═ */
+════════════════════════��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -4340,7 +4340,7 @@ fmtD=function(v){
 };
 function clearMemo(){ _memo={}; _fmtCache={}; _fmtDateCache={}; }
 
-// ── Managed timer registry ��� prevents orphan timers ────────────��────────
+// ── Managed timer registry ��� prevents orphan timers ────────��───��────────
 var _timers={};
 function setTimer(key, fn, ms){
   if(_timers[key]) clearTimeout(_timers[key]);
@@ -4776,6 +4776,7 @@ function throttle(fn,ms){
 function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboard'); } }
 
 function go(v){
+  console.log('[v0] go() called with v=', v);
   clearMemo();
   try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
@@ -4806,11 +4807,15 @@ function go(v){
 
   // ✓ VERIFY: View element lookup uses dynamic parameter 'v' (NOT hardcoded)
   var el = document.getElementById('v-'+v);
+  console.log('[v0] getElementById("v-'+v+'") returned:', el ? 'found' : 'NOT FOUND');
   if(!el){ 
+    console.log('[v0] ERROR: Element not found, showing toast');
     toast('Tela não encontrada: v-'+v); 
     return; 
   }
+  console.log('[v0] Before: el.className =', el.className);
   el.className = 'view on';
+  console.log('[v0] After: el.className =', el.className, 'computed display:', window.getComputedStyle(el).display);
 
   // scrollTop reset happens AFTER render so the full content height is known
   var _contentEl = document.getElementById('content');
@@ -11318,7 +11323,7 @@ function clearHist(){
   toast('🗑️ Histórico limpo.');
 }
 
-// ════════════════════════════════��══════════════════════════
+// ════════════════════════════════�����═════════════════════════
 // USUÁRIOS
 // ════════════════════════════════════════��═════���════════════
 var usrTab='all';
