@@ -403,7 +403,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
    VIEWS
 ═══════════════════════════════════════════ */
 .view { display:none; width:100%; box-sizing:border-box; padding:16px 20px 32px; touch-action:pan-y; }
-.view.on { display:block }
+.view.on { display:block; min-height:100% }
 
 /* ════�����══════════════════════════════════════
    PAGE HEADER
@@ -414,7 +414,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════���������������═�������═�����������������═════════════════════════════
+/* ═════════�����������������═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +577,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-════════════════════════��════�������════════���═���═ */
+═════════════════════���══��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -5772,7 +5772,7 @@ function delCli(id){
 
 // ═══════════════════════════════════════════════════════════
 // PRODUTOS
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════��
 function renderProd(){
   try {
   if(currentView!=='produtos') return;
@@ -10091,7 +10091,7 @@ function gerCancelConfirm(pedId){
   for(var _jj=0;_jj<_peds3.length;_jj++){
     if(_peds3[_jj].id===pedId&&(_peds3[_jj].status==='cancelado_ger')){
       busyUnlock('gerCancel');
-      toast('⚠️ Pedido já foi cancelado.','err');
+      toast('��️ Pedido já foi cancelado.','err');
       closeModal(); return;
     }
   }
@@ -11477,7 +11477,7 @@ function openUserModal(editId){
   var pwdFields=u?''
     :'<div class="field"><label>SENHA *</label><input type="password" id="uu-pwd" placeholder="Mínimo 6 caracteres"></div>'
     +'<div class="field"><label>CONFIRMAR SENHA *</label><input type="password" id="uu-pwd2" placeholder="Repita"></div>';
-  var html='<div class="modal-title">'+(u?'✏️ Editar':'➕ Novo')+' Usuário</div>'
+  var html='<div class="modal-title">'+(u?'��️ Editar':'➕ Novo')+' Usuário</div>'
     +'<div class="field"><label>NOME *</label><input id="uu-nome" value="'+(u?u.nome||'':'')+'" placeholder="Nome completo"></div>'
     +'<div class="field"><label>E-MAIL *</label><input id="uu-email" type="email" value="'+(u?u.email||'':'')+'" placeholder="email@empresa.com"></div>'
     +'<div class="field"><label>TELEFONE</label><input id="uu-tel" value="'+(u?u.telefone||'':'')+'" placeholder="(00) 00000-0000"></div>'
@@ -13400,7 +13400,7 @@ function nvParaCli(cliId){
 
 // ══���════════════════════════════════════════════════════════
 // SEED (dados de exemplo)
-// ══════════════════════════════════════════════��════════════
+// ══════════════════════════════════════════════��══���═════════
 function seed(){
   if(!getProds().length){
     saveProds([
