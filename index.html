@@ -2080,7 +2080,7 @@ function _cobrToSb(cobrObj){
   };
 }
 
-function _cobrFromSb(row){
+async function _cobrFromSb(row){
   // Converte linha Supabase (snake_case) → formato local (camelCase)
   if(!row) return null;
   return {
@@ -2281,7 +2281,7 @@ function _usuarioToSb(userObj){
   };
 }
 
-function _usuarioFromSb(row){
+async function _usuarioFromSb(row){
   // Converte linha Supabase (snake_case) → local (camelCase)
   if(!row) return null;
   return {
@@ -2510,7 +2510,7 @@ function _pedidoItemToSb(itemObj, pedidoId){
   };
 }
 
-function _pedidoItemFromSb(row){
+async function _pedidoItemFromSb(row){
   // Converte item Supabase → local
   if(!row) return null;
   return {
@@ -4574,7 +4574,7 @@ function validateSignupForm(){
 }
 
 // Submeter formulário de signup
-function submitSignup(){
+async function submitSignup(){
   console.log('[v0-AUDIT] submitSignup() START');
   if(!validateSignupForm()) {
     console.log('[v0-AUDIT] submitSignup() validation failed');
@@ -11766,7 +11766,7 @@ function _rotaToSb(rotaObj){
   };
 }
 
-function _rotaFromSb(row){
+async function _rotaFromSb(row){
   // Converte linha Supabase (snake_case) → formato local (camelCase)
   if(!row) return null;
   return {
