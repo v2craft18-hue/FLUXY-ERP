@@ -207,10 +207,12 @@ html,body {
   height:100vh;
   height:100dvh;
   overflow:hidden;
+  min-height:100dvh;
 }
 #app.visible {
-  display:flex;
+  display:flex !important;
   flex-direction:row;
+  align-items:stretch;
   width:100%;
   height:100vh;
 }
@@ -403,9 +405,9 @@ nav.nav-list::-webkit-scrollbar { display:none }
    VIEWS
 ═══════════════════════════════════════════ */
 .view { display:none; width:100%; box-sizing:border-box; padding:16px 20px 32px; touch-action:pan-y; }
-.view.on { display:block }
+.view.on { display:block; min-height:100% }
 
-/* ════���══════════════════════════════════════
+/* ════�����══════════════════════════════════════
    PAGE HEADER
 ═══════════════════════════════════════════ */
 .page-title {
@@ -414,7 +416,7 @@ nav.nav-list::-webkit-scrollbar { display:none }
 }
 .page-sub { font-size:12px; color:var(--t3); margin-bottom:0 }
 
-/* ═════════════�����������������═════════════════════════════
+/* ═══����═════�����������������═�������═�����������������═════════════════════════════
    CARDS
 ═══════════════════════════════════════════ */
 .card {
@@ -577,7 +579,7 @@ tr:last-child td { border-bottom:none }
 
 /* ═══════════════════════════════════════════
    TABS
-═══════════════════════════════════════════ */
+════════════��════════���══��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
 .tab {
   padding:6px 14px; border-radius:999px;
@@ -786,7 +788,7 @@ tr:last-child td { border-bottom:none }
    PERFORMANCE
 ═══════════════════════════════════════════ */
 /* GPU compositing layer for scroll container */
-#content { contain:style; }
+/* Removed contain:style due to layout collapse - prevents flex sizing */
 /* Reduce paint area on cards */
 
 /* Prevent text selection lag on interactive elements */
@@ -998,8 +1000,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 /* ── Android WebView / APK Performance optimizations ─────────────────── */
 /* GPU layer for cards — promotes to compositor, avoids main-thread repaints */
 .card { contain: content; }
-.view { contain: style; }
-#sb   { contain: style; }
+.view { /* contain: style removed - breaks flex layout sizing for views */ }
+#sb   { /* contain: style removed - causes sidebar collapse on app.visible */ }
 /* Scrollable containers — own GPU layer + momentum scroll */
 #entr-list, #nf-list, #cobr-list, .ger-list,
 #ped-list, #cli-list, #prod-list, #comm-list,
@@ -1135,7 +1137,7 @@ select option {
   }
 }
 
-/* ── General mobile responsiveness ─────────���─���─���─────────���───── */
+/* ─�� General mobile responsiveness ───���─────���─���─���─────────���───── */
 @media (max-width: 640px) {
   #content {
     padding-top: 10px !important;
@@ -1246,10 +1248,15 @@ select option {
     <button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);letter-spacing:.01em" onclick="doLogin()">
       Entrar no sistema &nbsp;→
     </button>
-    <div style="text-align:center;margin-top:22px;padding-top:18px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px">
+    <div style="text-align:center;margin-top:26px;margin-bottom:26px">
+      <p style="font-size:13px;color:var(--t2);margin:0 0 12px 0">Não possui conta?</p>
+      <button class="btn btn-p" style="width:100%;justify-content:center;padding:11px;font-size:13px;border-radius:var(--r2);font-weight:600;background:var(--green);color:white;opacity:0.9" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.9'" onclick="showSignup()">
+        ✨ Criar Conta Grátis
+      </button>
+    </div>
+    <div style="text-align:center;padding-top:16px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
       <button onclick="fixAccess()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">Problemas para acessar?</button>
       <button onclick="openResetPwd()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">🔑 Esqueci minha senha</button>
-    </div>
   </div>
 </div>
 
@@ -1725,93 +1732,21 @@ select option {
         <div id="notif-list"></div>
       </div>
 
+      <!-- ETAPA 12: Signup View -->
+      <div id="v-signup" class="view">
+        <!-- Será preenchido por renderSignup() -->
+      </div>
+
     </div><!-- #content -->
   </div><!-- #main -->
 </div><!-- #app -->
 
-<!-- Modal -->
-<div id="modal-bg" onclick="closeModalBg(event)">
-  <div id="modal-box">
-    <div id="modal-body"></div>
+  <div id="modal-bg" onclick="closeModalBg(event)">
+    <div id="modal-box">
+      <div id="modal-body"></div>
+    </div>
   </div>
-</div>
 
-
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
-
-  
-</head>
 <script>
 
 
@@ -1860,7 +1795,7 @@ window.FLUXI.ui=_FLUXI_UI;
 var EDIT_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in ms
 
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════���═════════════════════════════════════
 // FINANCIAL ENGINE — single source of truth for all KPI maths
 // ════════════════════════════════════════════════════════════════
 
@@ -2018,7 +1953,7 @@ var APP_STATE=(function(){
   return s;
 })();
 
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════���═════
 // STATE HELPERS  (safe wrappers for APP_STATE)
 // ════════════════════════════════════════════════════════════════
 var _stateDebug = false; // set true to see all state changes in console
@@ -2147,7 +2082,7 @@ function _cobrToSb(cobrObj){
   };
 }
 
-function _cobrFromSb(row){
+async function _cobrFromSb(row){
   // Converte linha Supabase (snake_case) → formato local (camelCase)
   if(!row) return null;
   return {
@@ -2348,7 +2283,7 @@ function _usuarioToSb(userObj){
   };
 }
 
-function _usuarioFromSb(row){
+async function _usuarioFromSb(row){
   // Converte linha Supabase (snake_case) → local (camelCase)
   if(!row) return null;
   return {
@@ -2577,7 +2512,7 @@ function _pedidoItemToSb(itemObj, pedidoId){
   };
 }
 
-function _pedidoItemFromSb(row){
+async function _pedidoItemFromSb(row){
   // Converte item Supabase → local
   if(!row) return null;
   return {
@@ -3801,7 +3736,7 @@ function renderIntegracoes(){
     + '</div>'
     + '<div class="row gap8 mt8">'
     + '<button class="btn btn-p" onclick="_finSalvarIntegracao()">💾 Salvar</button>'
-    + '<button class="btn btn-g" onclick="_finTestarConexao()">🧪 Testar Conexão</button>'
+    + '<button class="btn btn-g" onclick="_finTestarConexao()">�� Testar Conexão</button>'
     + '</div></div>';
 }
 
@@ -4267,13 +4202,25 @@ function sendNFWA(pedId){
 }
 
 function showApp(){
+  console.log('[v0-AUDIT] showApp() START');
   document.getElementById('login-wrap').style.display = 'none';
   document.getElementById('app').className = 'visible';
+  console.log('[v0-AUDIT] showApp() DOM updated, calling updateSidebar');
   APP_STATE.session=SESS;
   updateSidebar();
+  console.log('[v0-AUDIT] showApp() sidebar updated, calling applyRoleNav');
   applyRoleNav();
+  console.log('[v0-AUDIT] showApp() calling go(dashboard)');
   go('dashboard');
+  console.log('[v0-AUDIT] showApp() go(dashboard) returned, calling setTimeout fluxyLayoutDiag');
   setTimeout(fluxyLayoutDiag, 400);
+  console.log('[v0-AUDIT] showApp() END');
+}
+
+function showSignup(){
+  document.getElementById('login-wrap').style.display = 'none';
+  document.getElementById('app').className = 'visible';
+  go('signup');
 }
 
 function updateSidebar(){
@@ -4386,7 +4333,7 @@ function memo(key,fn){
   return _memo[key];
 }
 
-// ── Format memoization cache ──────────────────────────────────────────
+// ── Format memoization cache ─────────────────────────────────────���────
 var _fmtCache={};
 var _fmtDateCache={};
 var _origFmt=fmt;
@@ -4407,7 +4354,7 @@ fmtD=function(v){
 };
 function clearMemo(){ _memo={}; _fmtCache={}; _fmtDateCache={}; }
 
-// ── Managed timer registry — prevents orphan timers ─────────────────────
+// ── Managed timer registry ��� prevents orphan timers ────────��───��────────
 var _timers={};
 function setTimer(key, fn, ms){
   if(_timers[key]) clearTimeout(_timers[key]);
@@ -4454,7 +4401,7 @@ function clearAllTimers(){
 
 // ════════════════════════════════════════════════════════════════
 // CLEANUP ENGINE — prevent listener / timer / observer leaks
-// ════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════���════��═══��════════════
 var _cleanups={};
 function registerCleanup(viewId, fn){
   if(!_cleanups[viewId]) _cleanups[viewId]=[];
@@ -4535,7 +4482,207 @@ function recordFailedLogin(){
 }
 function resetLoginAttempts(){ _loginAttempts=0; _loginLockedUntil=0; }
 
+// ── ETAPA 12: Auto Cadastro SaaS ───────────────────────────────────────────
+
+// Validações de formulário de signup
+function isValidEmail(email){
+  var re=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return re.test(email.trim());
+}
+
+function isPasswordStrong(pwd){
+  // Mínimo 8 caracteres, misto (letra + número ou símbolo)
+  if(pwd.length<8) return false;
+  var hasLetter=/[a-zA-Z]/.test(pwd);
+  var hasNumber=/[0-9]/.test(pwd);
+  var hasSymbol=/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd);
+  return hasLetter && (hasNumber || hasSymbol);
+}
+
+function isEmailUnique(email){
+  var users=getUsers()||[];
+  email=email.trim().toLowerCase();
+  for(var i=0;i<users.length;i++){
+    if(users[i].email && users[i].email.trim().toLowerCase()===email){
+      return false;
+    }
+  }
+  return true;
+}
+
+function isValidCNPJ(cnpj){
+  if(!cnpj || cnpj.length===0) return true; // CNPJ é opcional
+  // Remove formatação
+  var clean=cnpj.replace(/\D/g,'');
+  // Validar tamanho
+  return clean.length===14;
+}
+
+// Renderizar tela de signup
+function renderSignup(){
+  var html='<div class="pg"><div class="pg-header"><h1>Criar Conta</h1><p>Crie sua empresa e comece agora</p></div><div class="form-container" style="max-width:400px;margin:40px auto">';
+  
+  html+='<div class="field"><label>Nome da Empresa *</label><input id="su-empresa" type="text" placeholder="Sua Empresa LTDA" maxlength="100"></div>';
+  html+='<div class="field"><label>Seu Nome *</label><input id="su-nome" type="text" placeholder="João Silva" maxlength="100"></div>';
+  html+='<div class="field"><label>E-mail *</label><input id="su-email" type="email" placeholder="seu@email.com" maxlength="100"></div>';
+  html+='<div class="field"><label>Senha *</label><input id="su-pwd" type="password" placeholder="••••••••" minlength="8"></div>';
+  html+='<div class="field" style="margin-bottom:26px"><label>Confirmar Senha *</label><input id="su-pwd-confirm" type="password" placeholder="••••••••" minlength="8"></div>';
+  
+  html+='<div class="field"><label>Telefone (opcional)</label><input id="su-phone" type="tel" placeholder="(11) 99999-9999" maxlength="20"></div>';
+  html+='<div class="field" style="margin-bottom:26px"><label>CNPJ (opcional)</label><input id="su-cnpj" type="text" placeholder="12.345.678/0001-90" maxlength="18"></div>';
+  
+  html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px"><input id="su-terms" type="checkbox"><label for="su-terms" style="margin:0;font-size:12px">Li e aceito os Termos de Uso</label></div>';
+  
+  html+='<button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2)" onclick="submitSignup()">Criar Conta</button>';
+  html+='<button class="btn btn-g" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);margin-top:10px" onclick="go(\'login\')">Voltar para Login</button>';
+  
+  html+='<div id="su-err" class="alert err" style="display:none;margin-top:16px"></div>';
+  
+  html+='</div></div>';
+  
+  var el=document.getElementById('v-signup');
+  if(el) el.innerHTML=html;
+}
+
+// Validar formulário de signup
+function validateSignupForm(){
+  var err=document.getElementById('su-err');
+  if(!err) return false;
+  err.style.display='none';
+  
+  var empresa=(document.getElementById('su-empresa').value||'').trim();
+  var nome=(document.getElementById('su-nome').value||'').trim();
+  var email=(document.getElementById('su-email').value||'').trim().toLowerCase();
+  var pwd=document.getElementById('su-pwd').value||'';
+  var pwd_confirm=document.getElementById('su-pwd-confirm').value||'';
+  var phone=(document.getElementById('su-phone').value||'').trim();
+  var cnpj=(document.getElementById('su-cnpj').value||'').trim();
+  var terms=document.getElementById('su-terms').checked;
+  
+  // Validações
+  if(!empresa){ err.textContent='Nome da empresa é obrigatório'; err.style.display='block'; return false; }
+  if(!nome){ err.textContent='Seu nome é obrigatório'; err.style.display='block'; return false; }
+  if(!email){ err.textContent='E-mail é obrigatório'; err.style.display='block'; return false; }
+  if(!isValidEmail(email)){ err.textContent='E-mail inválido'; err.style.display='block'; return false; }
+  if(!isEmailUnique(email)){ err.textContent='Este e-mail já está cadastrado'; err.style.display='block'; return false; }
+  if(!pwd){ err.textContent='Senha é obrigatória'; err.style.display='block'; return false; }
+  if(pwd.length<8){ err.textContent='Senha deve ter no mínimo 8 caracteres'; err.style.display='block'; return false; }
+  if(!isPasswordStrong(pwd)){ err.textContent='Senha deve conter letras e números/símbolos'; err.style.display='block'; return false; }
+  if(pwd!==pwd_confirm){ err.textContent='Senhas não coincidem'; err.style.display='block'; return false; }
+  if(cnpj && !isValidCNPJ(cnpj)){ err.textContent='CNPJ inválido'; err.style.display='block'; return false; }
+  if(!terms){ err.textContent='Você deve aceitar os Termos de Uso'; err.style.display='block'; return false; }
+  
+  return true;
+}
+
+// Submeter formulário de signup
+async function submitSignup(){
+  console.log('[v0-AUDIT] submitSignup() START');
+  if(!validateSignupForm()) {
+    console.log('[v0-AUDIT] submitSignup() validation failed');
+    return;
+  }
+  
+  var empresa=(document.getElementById('su-empresa').value||'').trim();
+  var nome=(document.getElementById('su-nome').value||'').trim();
+  var email=(document.getElementById('su-email').value||'').trim().toLowerCase();
+  var pwd=document.getElementById('su-pwd').value||'';
+  var phone=(document.getElementById('su-phone').value||'').trim();
+  var cnpj=(document.getElementById('su-cnpj').value||'').trim();
+  
+  try {
+    // 1. Criar empresa
+    var empresaId='empr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var empresas=stor_get(KEYS.empresas)||[];
+    empresas.push({
+      id:empresaId,
+      nome:empresa,
+      cnpj:cnpj||null,
+      telefone:phone||null,
+      criado_em:new Date().toISOString(),
+      ativo:true
+    });
+    stor_set(KEYS.empresas,empresas);
+    console.log('[Fluxy/Signup] Empresa criada:',empresaId);
+    
+    // 2. Hash da senha
+    var pwdHash=await hashPwd(pwd);
+    
+    // 3. Criar usuário admin
+    var userId='usr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var users=getUsers()||[];
+    users.push({
+      id:userId,
+      empresaId:empresaId,
+      nome:nome,
+      email:email,
+      pwd:pwdHash,
+      role:'adm',
+      ativo:true,
+      criado_em:new Date().toISOString(),
+      status:'ativo'
+    });
+    saveUsers(users);
+    console.log('[Fluxy/Signup] Usuário admin criado:',userId);
+    
+    // 4. Sincronizar com Supabase se online
+    if(CLOUD_ENABLED && _sb && await isCloudAvailable()){
+      try {
+        // Criar empresa no Supabase
+        var {data:emprData,error:emprErr}=await _sb.from('empresas').insert([{
+          id:empresaId,
+          nome:empresa,
+          cnpj:cnpj||null,
+          criado_em:new Date().toISOString()
+        }]).select().single();
+        
+        if(!emprErr){
+          // Criar usuário no Supabase
+          var {data:userDataErr}=await _sb.from('usuarios').insert([{
+            id:userId,
+            empresa_id:empresaId,
+            nome:nome,
+            email:email,
+            pwd:pwdHash,
+            role:'adm',
+            ativo:true,
+            criado_em:new Date().toISOString()
+          }]).select().single();
+          
+          console.log('[Fluxy/Signup] Sincronizado com Supabase');
+        }
+      } catch(syncErr){
+        console.warn('[Fluxy/Signup] Erro ao sincronizar com Supabase:',syncErr.message);
+        // Continua anyway — dados estão no localStorage
+      }
+    }
+    
+    // 5. Auto-login
+    SESS={userId:userId,nome:nome,email:email,role:'adm',empresaId:empresaId,plano:'basico'};
+    APP_STATE.session=SESS;
+    APP_STATE.set('auth.logged',true);
+    APP_STATE.set('auth.role','adm');
+    APP_STATE.set('auth.user',nome);
+    stor_set(KEYS.sess,SESS);
+    
+    // 6. Mostrar app e ir para dashboard
+    console.log('[v0-AUDIT] submitSignup() calling showApp()');
+    showApp();
+    console.log('[v0-AUDIT] submitSignup() showApp() returned, now calling go(dashboard)');
+    go('dashboard');
+    console.log('[v0-AUDIT] submitSignup() go(dashboard) returned');
+    
+    console.log('[Fluxy/Signup] ✅ Signup completo. Auto-login e dashboard iniciados.');
+    
+  } catch(e) {
+    console.error('[Fluxy/Signup] Erro fatal:',e);
+    var err=document.getElementById('su-err');
+    if(err){ err.textContent='Erro ao criar conta. Tente novamente.'; err.style.display='block'; }
+  }
+}
+
 // ── Safe localStorage wrapper with quota protection ───────────────────────
+
 function stor_get_safe(key){
   try{ return stor_get(key); }catch(e){ console.error('[Fluxy] stor_get error:',key,e); return null; }
 }
@@ -4650,12 +4797,14 @@ function throttle(fn,ms){
 function goFallback(){ try{ go(currentView||'dashboard'); }catch(e){ go('dashboard'); } }
 
 function go(v){
-  console.log('[GO] called with v=',v,'SESS=',SESS?SESS.role:'null','currentView=',currentView);
+  console.log('[v0-AUDIT] go() START: v='+v+', _viewToken='+CURRENT_VIEW_TOKEN);
   clearMemo();
   try{ runCleanup(currentView); }catch(e){}
   var _viewToken = ++CURRENT_VIEW_TOKEN;
+  console.log('[v0-AUDIT] go() after token increment: _viewToken='+_viewToken+', CURRENT_VIEW_TOKEN='+CURRENT_VIEW_TOKEN);
   try {
-  if(!SESS){ return; }
+  // Permitir acesso a signup e login sem autenticação
+  if(!SESS && v!=='signup' && v!=='reset-pwd'){ return; }
   // Permission checks
   if((v==='usuarios'||v==='notas') && !isAdm()){ toast('Sem permissão.'); return; }
   if(v==='rotas'&&!isAdm()&&!isGer()&&!isEntr()){ toast('Sem permissão.'); return; }
@@ -4674,12 +4823,21 @@ function go(v){
   try {
   // Hide all views
   var views = document.querySelectorAll('.view');
-  for(var i=0;i<views.length;i++) views[i].className = 'view';
+  for(var i=0;i<views.length;i++) {
+    views[i].className = 'view';
+  }
 
-  // Show target view
+  // ✓ VERIFY: View element lookup uses dynamic parameter 'v' (NOT hardcoded)
   var el = document.getElementById('v-'+v);
-  if(!el){ toast('Tela não encontrada: '+v); return; }
+  console.log('[v0-AUDIT] go() view lookup: v='+v+', el found='+(!!el)+', el.id='+(el?el.id:'N/A'));
+  if(!el){ 
+    console.log('[v0-AUDIT] go() ERROR: Element v-'+v+' not found!');
+    toast('Tela não encontrada: v-'+v); 
+    return; 
+  }
+  console.log('[v0-AUDIT] go() before className update: el.className="'+el.className+'"');
   el.className = 'view on';
+  console.log('[v0-AUDIT] go() after className update: el.className="'+el.className+'"');
 
   // scrollTop reset happens AFTER render so the full content height is known
   var _contentEl = document.getElementById('content');
@@ -4699,12 +4857,11 @@ function go(v){
     'pedidos':'Pedidos','meus-clientes':'Minha Rota','produtos':'Produtos','entregas':'Entregas',
     'relatorios':'Relatórios','comissoes':'Comissões','notas':'Notas Fiscais','gerente':'Painel Gerente','cobranças':'Cobranças','historico':'Histórico',
     'usuarios':'Usuários','rotas':'Rotas','perfil':'Meu Perfil',
-    'suporte':'Suporte','configuracoes':'Configurações','notificacoes':'Notificações','onboarding':'Primeiros Passos'
+    'suporte':'Suporte','configuracoes':'Configurações','notificacoes':'Notificações','onboarding':'Primeiros Passos','signup':'Criar Conta'
   };
   document.getElementById('pg-title').textContent = titles[v] || v;
   _flog('nav','→ '+v+' (token:'+CURRENT_VIEW_TOKEN+')');
   currentView = v;
-  console.log('[GO] currentView set to',v,'token=',_viewToken,'CURRENT=',CURRENT_VIEW_TOKEN);
   APP_STATE.ui.currentView = v;
   if(!APP_STATE.ui[v]||typeof APP_STATE.ui[v]!=='object') APP_STATE.ui[v]={};
   closeMob();
@@ -4734,17 +4891,26 @@ function go(v){
       'financeiro':renderFinanceiro,
       'metas':renderMetas,
       'catalogo':renderCatalogo,
-      'ranking':renderRanking
+      'ranking':renderRanking,
+      'signup':renderSignup
     };
     if(_renderMap[v]){
+      console.log('[v0-AUDIT] go() render: found renderFn for v='+v);
       // rAF token check: abort if user already navigated away
       (function(tok, fn, key){
+        console.log('[v0-AUDIT] go() rAF: tok='+tok+', CURRENT_VIEW_TOKEN='+CURRENT_VIEW_TOKEN);
         requestAnimationFrame(function(){
-          console.log('[RAF] fired for',key,'tok=',tok,'CURRENT=',CURRENT_VIEW_TOKEN,'match=',tok===CURRENT_VIEW_TOKEN);
-          if(tok !== CURRENT_VIEW_TOKEN){ console.log('[RAF] ABORTED stale token',key); return; } // stale render — abort
+          console.log('[v0-AUDIT] go() inside rAF: tok='+tok+', CURRENT_VIEW_TOKEN='+CURRENT_VIEW_TOKEN+', match='+(tok===CURRENT_VIEW_TOKEN));
+          if(tok !== CURRENT_VIEW_TOKEN){ 
+            console.log('[v0-AUDIT] go() rAF ABORT: token mismatch!');
+            return; 
+          }
+          console.log('[v0-AUDIT] go() calling safeRender for '+key);
           safeRender(key, fn);
         });
       })(_viewToken, _renderMap[v], v);
+    } else {
+      console.log('[v0-AUDIT] go() WARNING: No render function for '+v);
     }
     // Re-enable scroll after render — forces browser to recalculate scroll area
     if(_ce){
@@ -4851,9 +5017,9 @@ function closeMob(){
   document.body.style.overflow='';
 }
 
-// ═══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════������═══════════
 // UTILS
-// ═══════════════════════════════════════════════════════════
+// ═══════════��═══════════════════════════════════════════════
 function fmt(v){
   var n = parseFloat(v)||0;
   return 'R$ '+n.toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.');
@@ -5187,7 +5353,7 @@ function renderDashEntr(){
 
 // ═══════════════════════════════════════════════════════════
 // CLIENTES
-// ═══════════════════════════════════════════════════════════
+// ════════��══════════════════════════════════════════════════
 function renderCli(){
   try {
   console.log('[RENDER_CLI] currentView=',currentView);
@@ -5608,7 +5774,7 @@ function delCli(id){
 
 // ═══════════════════════════════════════════════════════════
 // PRODUTOS
-// ═══════════════════════════════════════════════════════════
+// ════════════════════════════��═════════════════��═══════════��
 function renderProd(){
   try {
   if(currentView!=='produtos') return;
@@ -6580,7 +6746,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
       if(nfApproved) bw.appendChild(mkb('📲 Nota','btn-gr btn-sm',function(){shareNota(pid);}));
     }
 
-    // ── ADM-only: Cancel / Status / Delete ────────────────────────
+    // ── ADM-only: Cancel / Status / Delete ────────��───────────────
     if(isAdm()){
       if(!pCancelled) bw.appendChild(mkb('❌ Cancelar','btn-r btn-sm',function(){cancelPed(pid);}));
       else bw.appendChild(mkb('🔄 Reativar','btn-y btn-sm',function(){chgStatus(pid);}));
@@ -6930,7 +7096,7 @@ function emitirNF(pedId){
     +'</div>'
     +'<div class="modal-foot">'
       +'<button class="btn btn-g" onclick="closeModal()">Fechar</button>'
-      +'<button class="btn btn-p" onclick="copiarXmlNF()">📋 Copiar XML</button>'
+      +'<button class="btn btn-p" onclick="copiarXmlNF()">���� Copiar XML</button>'
     +'</div>';
   openModal(html);
   toast('🧾 NF '+nfNum+' gerada!');
@@ -7451,7 +7617,7 @@ function printPed(id){
       +'}catch(e){window.print();}'
     +'}'
     +'function compartilharWhats(){'
-      +'var txt=encodeURIComponent("Pedido '+p.id+' — '+p.cliNome+' — R$ '+total.toFixed(2)+'");'
+      +'var txt=encodeURIComponent("Pedido '+p.id+' ��� '+p.cliNome+' — R$ '+total.toFixed(2)+'");'
       +'window.open("https://wa.me/?text="+txt,"_blank");'
     +'}'
     +'<\/script>'
@@ -8229,7 +8395,7 @@ function exportRelPDF(){
   var periodoLabel={hoje:'Hoje',semana:'Últimos 7 dias',mes:'Este mês',tudo:'Todo o período'}[relPeriod]||relPeriod;
   var now=new Date().toISOString();
 
-  // ── Build products table data ────────────────────────────────────────────
+  // ── Build products table data ───────────────��──────────────────���─────────
   var prodMapa={};
   for(var i=0;i<aprovados.length;i++){
     var itens=aprovados[i].itens||[];
@@ -8304,7 +8470,7 @@ function exportRelPDF(){
     // KPIs
     +'<div class="kpi-grid">'
       +'<div class="kpi-box"><div class="kpi-lbl">💰 Total Vendido</div><div class="kpi-val" style="color:#16a34a">'+fmt(total)+'</div><div class="kpi-sub">'+aprovados.length+' pedidos aprovados</div></div>'
-      +'<div class="kpi-box"><div class="kpi-lbl">🎫 Ticket Médio</div><div class="kpi-val" style="color:#2563eb">'+fmt(ticket)+'</div><div class="kpi-sub">por pedido</div></div>'
+      +'<div class="kpi-box"><div class="kpi-lbl">���� Ticket Médio</div><div class="kpi-val" style="color:#2563eb">'+fmt(ticket)+'</div><div class="kpi-sub">por pedido</div></div>'
       +'<div class="kpi-box"><div class="kpi-lbl">📦 Itens Vendidos</div><div class="kpi-val" style="color:#7c3aed">'+totalQtyProd+'</div><div class="kpi-sub">'+prodLista.length+' produtos diferentes</div></div>'
       +'<div class="kpi-box"><div class="kpi-lbl">📋 Total Pedidos</div><div class="kpi-val" style="color:#d97706">'+peds.length+'</div><div class="kpi-sub">no período selecionado</div></div>'
     +'</div>'
@@ -8579,7 +8745,7 @@ function exportCSV(){
 
 // ═══════════════════════════════════════════════════════════
 // COMISSÕES
-// ═══════════════════════════════════════════════════════════
+// ══════════���════════════════════════════════════════════════
 // ── Commission helpers ────────────────────────────────────────────────────
 function prodModalToggleComm(){
   var sel=document.getElementById('pp-comm-type');
@@ -9188,7 +9354,7 @@ function renderNotas(){
           +'<div class="fs12 t1">'+fmtD(p.criadoEm)+'</div>'
         +'</div>'
       +'</div>'
-      +(p.nfChave?'<div style="font-size:9px;font-family:JetBrains Mono,monospace;color:var(--t3);padding:5px 8px;background:var(--s2);border-radius:6px;margin-bottom:8px;word-break:break-all">🔑 '+p.nfChave.replace(/(.{4})/g,"$1 ").trim()+'</div>':'')
+      +(p.nfChave?'<div style="font-size:9px;font-family:JetBrains Mono,monospace;color:var(--t3);padding:5px 8px;background:var(--s2);border-radius:6px;margin-bottom:8px;word-break:break-all">�� '+p.nfChave.replace(/(.{4})/g,"$1 ").trim()+'</div>':'')
       +(p.nfEmitidaEm?'<div class="fs11 t3 mb8">Emitida em: '+fmtDT(p.nfEmitidaEm)+'</div>':'')
       +'<div class="row gap6" style="flex-wrap:wrap" id="nf-btns-'+p.id+'"></div>';
 
@@ -9927,7 +10093,7 @@ function gerCancelConfirm(pedId){
   for(var _jj=0;_jj<_peds3.length;_jj++){
     if(_peds3[_jj].id===pedId&&(_peds3[_jj].status==='cancelado_ger')){
       busyUnlock('gerCancel');
-      toast('⚠️ Pedido já foi cancelado.','err');
+      toast('��️ Pedido já foi cancelado.','err');
       closeModal(); return;
     }
   }
@@ -10389,7 +10555,7 @@ function renderSuporte(){
 
 function setSupTab(tab){ _supTab=tab; safeRender('suporte',renderSuporte); }
 
-// ── FAQ ──────────────────────────────────────────────────────────
+// ── FAQ ───────────────────────��──────────────────────────────────
 
 
 
@@ -10721,7 +10887,7 @@ function renderCobr(){
   var valPend=kpis.valPend,valAtr=kpis.valAtr,valPago=kpis.valPago,valAguard=kpis.valAguard,valTotal=kpis.valTotal;
   var pct=kpis.pctPago;
   var kpEl=document.getElementById('cobr-kpis');
-  // ── KPI grid: always 4 cards (stable 2×2) ───────────────────────────
+  // ── KPI grid: always 4 cards (stable 2×2) ─────────────────────────��─
   if(kpEl) kpEl.innerHTML=''
     // Row 1: Total Geral | Pago
     +'<div class="kpi-card" style="border-top:2px solid #3B82F655">'
@@ -10730,7 +10896,7 @@ function renderCobr(){
       +'<div class="kpi-sub">'+mine.length+' cobrança'+(mine.length!==1?'s':'')+'</div>'
     +'</div>'
     +'<div class="kpi-card" style="border-top:2px solid #10B98155">'
-      +'<div class="kpi-label">✅ Recebido</div>'
+      +'<div class="kpi-label">�� Recebido</div>'
       +'<div class="kpi-value" style="color:#10B981;font-size:20px">'+fmt(valPago)+'</div>'
       +'<div class="kpi-sub">'+nPago+' pago'+(nPago!==1?'s':'')+'</div>'
     +'</div>'
@@ -10858,7 +11024,7 @@ function renderCobr(){
     if(cobr.fotoNota){
       var fotoBtn=document.createElement('button');
       fotoBtn.className='btn btn-g btn-sm'; fotoBtn.style.flex='1';
-      fotoBtn.innerHTML='🖼️ Ver Foto';
+      fotoBtn.innerHTML='🖼��� Ver Foto';
       fotoBtn.setAttribute('data-id',cobr.id);
       fotoBtn.onclick=function(){verFotoCobr(this.getAttribute('data-id'));};
       bw.appendChild(fotoBtn);
@@ -11052,7 +11218,7 @@ function gerRecusarPagamentoOk(cobrId){
   closeModal();
   applyRoleNav();
   safeRender('cobranças',renderCobr);
-  toast('❌ Confirmação recusada. Cobrança voltou para pendente.','ok');
+  toast('❌ Confirma��ão recusada. Cobrança voltou para pendente.','ok');
 }
 
 function confirmarPago(cobrId){
@@ -11186,7 +11352,7 @@ function clearHist(){
   toast('🗑️ Histórico limpo.');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ════════════════════════════════�����═════════════════════════
 // USUÁRIOS
 // ════════════════════════════════════════��═════���════════════
 var usrTab='all';
@@ -11313,7 +11479,7 @@ function openUserModal(editId){
   var pwdFields=u?''
     :'<div class="field"><label>SENHA *</label><input type="password" id="uu-pwd" placeholder="Mínimo 6 caracteres"></div>'
     +'<div class="field"><label>CONFIRMAR SENHA *</label><input type="password" id="uu-pwd2" placeholder="Repita"></div>';
-  var html='<div class="modal-title">'+(u?'✏️ Editar':'➕ Novo')+' Usuário</div>'
+  var html='<div class="modal-title">'+(u?'��️ Editar':'➕ Novo')+' Usuário</div>'
     +'<div class="field"><label>NOME *</label><input id="uu-nome" value="'+(u?u.nome||'':'')+'" placeholder="Nome completo"></div>'
     +'<div class="field"><label>E-MAIL *</label><input id="uu-email" type="email" value="'+(u?u.email||'':'')+'" placeholder="email@empresa.com"></div>'
     +'<div class="field"><label>TELEFONE</label><input id="uu-tel" value="'+(u?u.telefone||'':'')+'" placeholder="(00) 00000-0000"></div>'
@@ -11602,7 +11768,7 @@ function _rotaToSb(rotaObj){
   };
 }
 
-function _rotaFromSb(row){
+async function _rotaFromSb(row){
   // Converte linha Supabase (snake_case) → formato local (camelCase)
   if(!row) return null;
   return {
@@ -12309,7 +12475,7 @@ function openRotaMaps(rotaId){
     var addr=cli&&cli.endereco?cli.endereco:'';
     if(addr) addresses.push(encodeURIComponent(addr));
   }
-  if(!addresses.length){ toast('Nenhum endereço na rota.','err'); return; }
+  if(!addresses.length){ toast('Nenhum endere��o na rota.','err'); return; }
   var url='https://www.google.com/maps/dir/'+addresses.join('/');
   window.open(url,'_blank');
   toast('🗺️ Abrindo Google Maps...','ok');
@@ -13113,7 +13279,7 @@ function saveEditPedFull(){
 // Keep old saveEditPed for backward compat (any cached onclick still works)
 function saveEditPed(id,nItems){ _FLUXI_UI.ep.id=id; saveEditPedFull(); }
 
-// ── Meus Clientes / Rota ─────────────────────────────────────────────────
+// ── Meus Clientes / Rota ───────────��─────────────────────────────────────
 var mcDay='todos';
 var mcSem=false;
 
@@ -13234,9 +13400,9 @@ function nvParaCli(cliId){
   go('nova-venda');
 }
 
-// ══���════════════════════════════════════════════════════════
+// ══���═══════════════════════════════��════════════════════════
 // SEED (dados de exemplo)
-// ══════════════════════════════════════════════��════════════
+// ═════════════════════════════════════��════════��══���═════════
 function seed(){
   if(!getProds().length){
     saveProds([
@@ -13292,7 +13458,7 @@ if(SESS){
 }
 
 
-// ═══════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════���═
 // PWA — SERVICE WORKER + INSTALL PROMPT
 // ═══════════════════════════════════════════════════════════════
 var _pwaPrompt=null;
@@ -13374,7 +13540,7 @@ function pwaInstall(){
   });
 }
 
-// ── Wire up buttons ──────────────────────────────────────────────
+// ── Wire up buttons ────────���──���───────────────────���──────────────
 document.addEventListener('DOMContentLoaded',function(){
   var installBtn=document.getElementById('pwa-install-btn');
   var dismissBtn=document.getElementById('pwa-dismiss-btn');
@@ -13591,7 +13757,7 @@ window.addEventListener('error', function(e){
   }catch(_){}
 }, true);
 
-// ── Modal leak guard — ensure modal can always be closed ─────────────
+// ── Modal leak guard — ensure modal can always be closed ────���────────
 document.addEventListener('keydown',function(e){
   if((e.key==='Escape'||e.keyCode===27)&&document.getElementById('modal-bg')&&
      document.getElementById('modal-bg').className==='on'){
@@ -13747,7 +13913,7 @@ if(pwaIsInstalled()){
   if(_b) _b.style.display='none';
 }
 
-// ── Guard: protect SPA from @media print side-effects ────────────
+// ��─ Guard: protect SPA from @media print side-effects ────────────
 // Some Android browsers apply @media print to the parent when an
 // iframe or popup prints, triggering .view{display:none!important}
 // and blanking the app. We capture the active view before printing
