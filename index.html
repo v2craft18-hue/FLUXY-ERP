@@ -4534,6 +4534,7 @@ function renderSignup(){
     console.log('[renderSignup] STEP 4: Setting innerHTML');
     el.innerHTML=html;
     console.log('[renderSignup] STEP 5: innerHTML set, el.innerHTML.length=',el.innerHTML.length);
+    console.log('[renderSignup] STEP 6: Checking el.className=',el.className);
   } else {
     console.log('[renderSignup] ERROR: Element v-signup not found!');
   }
@@ -4810,28 +4811,19 @@ function go(v){
 
   // View switching — wrapped so DOM errors don't blank the app
   try {
-  console.log('[GO] STEP 4: Hiding all views');
   // Hide all views
   var views = document.querySelectorAll('.view');
-  console.log('[GO] Found',views.length,'views to hide');
   for(var i=0;i<views.length;i++) {
-    console.log('[GO]   - Hiding view',i,'current class=',views[i].className);
     views[i].className = 'view';
   }
 
-  console.log('[GO] STEP 5: Looking for v-'+v);
   // Show target view
   var el = document.getElementById('v-'+v);
   if(!el){ 
-    console.log('[GO] ERROR: Element v-'+v+' NOT FOUND'); 
-    toast('Tela não encontrada: '+v); 
+    toast('Tela não encontrada: v-'+v); 
     return; 
   }
-  console.log('[GO] STEP 6: Found v-'+v+', el=',el,'current class=',el.className);
-  console.log('[GO] STEP 7: Adding class "view on"');
   el.className = 'view on';
-  console.log('[GO] STEP 8: Class added, now el.className=',el.className);
-  console.log('[GO] STEP 9: Checking computed style display=',window.getComputedStyle(el).display);
 
   // scrollTop reset happens AFTER render so the full content height is known
   var _contentEl = document.getElementById('content');
@@ -4893,14 +4885,8 @@ function go(v){
       console.log('[GO] STEP 10: Render function exists for',v);
       // rAF token check: abort if user already navigated away
       (function(tok, fn, key){
-        console.log('[GO] STEP 11a: RAF wrapper called with tok=',tok,'key=',key);
         requestAnimationFrame(function(){
-          console.log('[GO] STEP 11b: RAF callback fired for',key,'tok=',tok,'CURRENT=',CURRENT_VIEW_TOKEN,'match=',tok===CURRENT_VIEW_TOKEN);
-          if(tok !== CURRENT_VIEW_TOKEN){ 
-            console.log('[GO] STEP 11c: RAF ABORTED - stale token'); 
-            return; 
-          }
-          console.log('[GO] STEP 12: Token OK, calling safeRender');
+          if(tok !== CURRENT_VIEW_TOKEN){ return; }
           safeRender(key, fn);
         });
       })(_viewToken, _renderMap[v], v);
