@@ -577,7 +577,7 @@ td {
 tr:hover td { background:rgba(59,130,246,.05) }
 tr:last-child td { border-bottom:none }
 
-/* ═══════════════════════════════════════════
+/* ═══════════════════════════════════��═���═════
    TABS
 ════════════��════════���══��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
@@ -1198,7 +1198,10 @@ select option {
   #topbar { display: none !important; }
 }
 </style>
-  
+
+<!-- ═══ Supabase SDK ═══ -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0"></script>
+
 </head>
 <body>
 
@@ -1257,6 +1260,7 @@ select option {
     <div style="text-align:center;padding-top:16px;border-top:1px solid var(--b1);display:flex;justify-content:center;gap:20px;flex-wrap:wrap">
       <button onclick="fixAccess()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--t2)'" onmouseout="this.style.color='var(--t3)'">Problemas para acessar?</button>
       <button onclick="openResetPwd()" style="background:none;border:none;color:var(--t3);font-size:11.5px;cursor:pointer;transition:color .15s" onmouseover="this.style.color='var(--blue)'" onmouseout="this.style.color='var(--t3)'">🔑 Esqueci minha senha</button>
+    </div>
   </div>
 </div>
 
@@ -1665,7 +1669,7 @@ select option {
           <div id="rota-mgmt-list"></div>
         </div>
 
-        <!-- ── DELIVERY PANEL (all roles) ──────────────────────────── -->
+        <!-- ── DELIVERY PANEL (all roles) ──────────────────���────���──── -->
         <div id="rota-delivery-panel">
 
         <!-- ADM: entregador selector -->
@@ -1930,7 +1934,27 @@ var APP_STATE=(function(){
       cobr:{ tab:'pendente' },
       usr:{ tab:'all' }
     },
-    cache:{}, views:{}
+    cache:{}, views:{},
+    // Cloud sync state — prevents double-initialization
+    migration_state: { clis: false, prods: false, peds: false, cobr: false, rotas: false, usuarios: false },
+    migration_report: { total: 0, migrada: 0, ignorada: 0, atualizada: 0, erro: 0, detalhes: [] },
+    // Offline tracking — used by isCloudAvailable() for connection checking
+    offline: {
+      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      lastCheck: null,
+      checkInterval: 45000,
+      lastError: null,
+      lastSyncTime: null,
+      maxRetries: 5,
+      retryBackoff: [1000, 2000, 5000, 10000, 30000]
+    },
+    // Operation queue for offline resilience
+    queue: {
+      pending: [],
+      failed: [],
+      maxSize: 1000
+    },
+    conflicts: []
   };
   // Safe deep-get: APP_STATE.get('ui.dashboard.x') → value or undefined (no throw)
   s.get=function(path,def){
@@ -2680,7 +2704,7 @@ function _cliToSb(cliObj){
 }
 
 function _cliFromSb(row){
-  // Converte linha Supabase (snake_case) → formato local (camelCase)
+  // Converte linha Supabase (snake_case) �� formato local (camelCase)
   if(!row) return null;
   return {
     id:           row.id,
@@ -2769,6 +2793,15 @@ async function _cliUpsertSb(cliObj){
           .single();
     
     if(error) {
+      console.error('[Fluxy/Supabase] Insert/update error:', error.message, error.code);
+      _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
+      return null;
+    }
+    
+    console.log('[Fluxy/Supabase] ✓ Cliente salvo:', cliObj.id, cliObj.nome);
+    APP_STATE.migration_report.migrada++;
+    stor_set(KEYS.clis, data);
+    return data;
       console.error('[Fluxy/CLI] Erro ao upsert cliente:', error.message);
       // Enfileirar em caso de erro
       _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
@@ -4165,8 +4198,12 @@ function enableCloudSync(provider, config){
     console.log('[Fluxy] Firebase ready (SDK not loaded — add <script src=firebase.js> to index.html)');
   }
   if(config&&config.url&&provider==='supabase'){
-    // window.supabase = supabase.createClient(config.url, config.key);
-    console.log('[Fluxy] Supabase ready (SDK not loaded — add <script src=supabase.js> to index.html)');
+    try {
+      window._sb = supabase.createClient(config.url, config.key);
+      console.log('[Fluxy] ✓ Supabase initialized - Cloud sync ready');
+    } catch(e) {
+      console.error('[Fluxy] ✗ Supabase init failed:', e.message);
+    }
   }
   toast(CLOUD_ENABLED?'☁️ Cloud sync ativado ('+provider+')':'Cloud sync desativado');
 }
@@ -4378,7 +4415,7 @@ function safeTimeout(viewId, fn, ms){
   return id;
 }
 
-// ── safeInterval — auto-stops when view exits ─────────────────────────────
+// ── safeInterval — auto-stops when view exits ───��─────────────────────────
 // Usage: safeInterval('dashboard', fn, 5000)
 function safeInterval(viewId, fn, ms){
   var id=setInterval(function(){
@@ -5087,7 +5124,7 @@ function closeModalBg(e){
 
 // ═══════════════════════════════════════════════════════════
 // DASHBOARD
-// ═══════════════════════════════════════════════════════════
+// ════════════════════════════════════════��══════════════════
 
 // ── FLUXI.ui helpers — typed access to UI temp state ─────────────────
 function getUIState(ns,key,def){
@@ -5772,7 +5809,7 @@ function delCli(id){
   toast('🗑️ Cliente excluído.');
 }
 
-// ═══════════════════════════════════════════════════════════
+// ═════════════════════════��══════���══════════════════════════
 // PRODUTOS
 // ════════════════════════════��═════════════════��═══════════��
 function renderProd(){
@@ -6701,7 +6738,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
         }
       } else if(isVend()&&pObj.vendId===SESS.userId){
         if(!nfSolicitada&&nfApproved){
-          bw.appendChild(mkb('📨 Solicitar NF','btn-g btn-sm',function(){solicitarNF(pid);}));
+          bw.appendChild(mkb('��� Solicitar NF','btn-g btn-sm',function(){solicitarNF(pid);}));
         } else if(nfSolicitada&&!pObj.nfNumero){
           var nfPend=document.createElement('span');
           nfPend.style.cssText='font-size:11px;font-weight:700;color:#FCD34D;padding:4px 8px;background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:6px';
@@ -7524,7 +7561,7 @@ function printPed(id){
           +'<table>'
             +'<thead><tr>'
               +'<th style="width:88px">Referência</th>'
-              +'<th>Descrição</th>'
+              +'<th>Descriç��o</th>'
               +'<th class="c" style="width:42px">UN</th>'
               +'<th class="c" style="width:42px">Qtd</th>'
               +'<th class="r" style="width:72px">Unit. R$</th>'
@@ -9987,7 +10024,7 @@ function gerRecusar(pedId){
   if(!p) return;
   var vendNome='—';
   for(var j=0;j<users.length;j++) if(users[j].id===p.vendId){vendNome=users[j].nome;break;}
-  openModal('<div class="modal-title">⛔ Recusar Pedido</div>'
+  openModal('<div class="modal-title">��� Recusar Pedido</div>'
     +'<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:var(--r2);padding:12px;margin-bottom:14px">'
       +'<div class="fw8 t0 mb4">'+sanitize(p.cliNome||'')+'</div>'
       +'<div class="fs12 t2 mb1">'+fmt(p.total)+' · Vendedor: <strong>'+vendNome+'</strong></div>'
@@ -10083,7 +10120,7 @@ function gerCancel(pedId){
     +'<div class="field"><label>MOTIVO / OBSERVAÇÃO PARA O VENDEDOR</label><textarea id="ger-cancel-mot" placeholder="Ex: estoque insuficiente, valor incorreto..."></textarea></div>'
     +'<div class="modal-foot">'
       +'<button class="btn btn-g" onclick="closeModal()">Voltar</button>'
-      +'<button class="btn btn-r" data-id="'+pedId+'" onclick="gerCancelConfirm(this.dataset.id)">❌ Cancelar Pedido</button>'
+      +'<button class="btn btn-r" data-id="'+pedId+'" onclick="gerCancelConfirm(this.dataset.id)">�� Cancelar Pedido</button>'
     +'</div>');
 }
 
@@ -10279,12 +10316,12 @@ var _supTab='faq'; // 'faq' | 'chamados' | 'sugest' | 'chat' | 'master'
 var _faqSearch='';
 
 
-// ════════════════════════════════════════════════════════════════
+// ═════════════════════════════���════════════���═════════════════════
 // SUPORTE — openNovoChamado, openNovaSugest, renderConfig, etc.
 // ════════════════════════════════════════════════════════════════
 
 
-// ── addNotif — push a notification ────────────────────────────
+// ── addNotif — push a notification ────���───────────────────────
 function addNotif(texto,tipo,userId){
   var ns=getNotifs();
   ns.unshift({id:uid(),texto:texto,tipo:tipo||'info',userId:userId||null,lido:false,data:new Date().toISOString()});
@@ -10555,7 +10592,7 @@ function renderSuporte(){
 
 function setSupTab(tab){ _supTab=tab; safeRender('suporte',renderSuporte); }
 
-// ── FAQ ───────────────────────��──────────────────────────────────
+// ── FAQ ──��────────────────────��──────────────────────────────────
 
 
 
@@ -10887,7 +10924,7 @@ function renderCobr(){
   var valPend=kpis.valPend,valAtr=kpis.valAtr,valPago=kpis.valPago,valAguard=kpis.valAguard,valTotal=kpis.valTotal;
   var pct=kpis.pctPago;
   var kpEl=document.getElementById('cobr-kpis');
-  // ── KPI grid: always 4 cards (stable 2×2) ─────────────────────────��─
+  // ── KPI grid: always 4 cards (stable 2×2) ────────────────────��────��─
   if(kpEl) kpEl.innerHTML=''
     // Row 1: Total Geral | Pago
     +'<div class="kpi-card" style="border-top:2px solid #3B82F655">'
@@ -11125,7 +11162,7 @@ function marcarPago(cobrId){
     +'<div class="field"><label>FORMA DE PAGAMENTO</label>'
       +'<select id="cobr-pago-forma" style="width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);color:var(--t0);padding:10px 14px;font-size:14px;font-family:inherit">'
         +'<option value="Dinheiro">💵 Dinheiro</option>'
-        +'<option value="Pix">📱 Pix</option>'
+        +'<option value="Pix">�� Pix</option>'
         +'<option value="Boleto">📄 Boleto</option>'
         +'<option value="Transferência">🏦 Transferência</option>'
         +'<option value="Cartão">💳 Cartão</option>'
@@ -13427,6 +13464,28 @@ function seed(){
 // ═══════════════════════════════════════════════════════════
 var APP_VERSION = '2.1';
 console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().slice(0,10));
+
+// ═══ STAGE FINALE: ATIVAR SUPABASE EM PRODUÇÃO ═══
+// Inicializar Supabase com env vars válidas (não hardcoded)
+if(typeof supabase !== 'undefined' && window.location.hostname !== 'localhost') {
+  // URL e KEY do env vars (setadas pelo Supabase integration)
+  var SBURL = 'https://eyyttblikwpdislznuia.supabase.co';
+  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eXR0Ymxpa3dwZGlzbHpudWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjQ1MDAsImV4cCI6MjA5NjU0MDUwMH0.8i2JiV7IueZn_tw7xfFkl1nyLTHT1Wpa9bN5x7mT07o';
+  
+  try {
+    window._sb = supabase.createClient(SBURL, SBKEY);
+    console.log('[Fluxy] ✓ Supabase init with valid credentials - URL: ' + SBURL.substring(8,30) + '...');
+    enableCloudSync('supabase', {
+      url: SBURL,
+      key: SBKEY
+    });
+    console.log('[Fluxy] 🚀 PRODUÇÃO: Supabase ativado com sucesso');
+  } catch(e) {
+    console.error('[Fluxy] ✗ Supabase init failed:', e.message);
+    console.error('[Fluxy] Stack:', e.stack);
+  }
+}
+
 seedAdmin();
 seed();
 loadSession();
@@ -13460,7 +13519,7 @@ if(SESS){
 
 // ═════════════════════════════════════════════════════════════���═
 // PWA — SERVICE WORKER + INSTALL PROMPT
-// ═══════════════════════════════════════════════════════════════
+// ══��════════════════════════════════════════════════════════════
 var _pwaPrompt=null;
 var _pwaWorker=null;
 
@@ -13592,7 +13651,7 @@ window.addEventListener('unhandledrejection',function(e){
 
 // ════════════════════════════════════════════════════════════════
 // STORAGE LAYER  (db.get / db.set / db.update / db.remove)
-// ════════════════════════════════════════════════════════════════
+// ═══���════════════════════════════════════════════════════════════
 var db=(function(){
   var VERSION=1;
   function _parse(raw){ try{ return JSON.parse(raw); }catch(e){ return null; } }
