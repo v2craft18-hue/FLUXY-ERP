@@ -2801,12 +2801,6 @@ async function _cliUpsertSb(cliObj){
     console.log('[Fluxy/Supabase] ✓ Cliente salvo:', cliObj.id, cliObj.nome);
     APP_STATE.migration_report.migrada++;
     stor_set(KEYS.clis, data);
-    return data;
-      console.error('[Fluxy/CLI] Erro ao upsert cliente:', error.message);
-      // Enfileirar em caso de erro
-      _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
-      return null;
-    }
     console.log('[Fluxy/CLI] Cliente '+cliObj.id+' salvo no Supabase');
     return data ? _cliFromSb(data) : null;
   } catch(e) {
