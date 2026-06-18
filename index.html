@@ -2101,7 +2101,6 @@ function _cobrToSb(cobrObj){
     vencimento:      cobrObj.vencimento || null,
     pago_em:         cobrObj.pagoEm || null,
     obs:             cobrObj.obs || '',
-    deleted:         cobrObj.deleted || false,
     criado_em:       cobrObj.criadoEm || new Date().toISOString()
   };
 }
@@ -2140,7 +2139,6 @@ async function loadCobrFromSb(){
       .from('cobracas')
       .select('*')
       .eq('empresa_id', SESS.empresaId)
-      .eq('deleted', false)
       .order('vencimento', { ascending: true });
     
     if(error) {
@@ -2302,7 +2300,6 @@ function _usuarioToSb(userObj){
     ativo:         userObj.ativo !== false,
     telefone:      userObj.telefone || '',
     status:        userObj.status || 'ativo',
-    deleted:       userObj.deleted || false,
     criado_em:     userObj.criadoEm || new Date().toISOString()
   };
 }
@@ -2332,7 +2329,6 @@ async function loadUsuariosFromSb(){
       .from('usuarios')
       .select('*')
       .eq('empresa_id', SESS.empresaId)
-      .eq('deleted', false)
       .order('criado_em', { ascending: false });
     
     if(error) {
@@ -2493,7 +2489,6 @@ function _pedidoToSb(pedObj){
     nf_status:    pedObj.nfStatus || null,
     comissao:     pedObj.commVal || 0,
     solicitar_nf: pedObj.solicitarNF || false,
-    deleted:      pedObj.deleted || false,
     criado_em:    pedObj.criadoEm || new Date().toISOString()
   };
 }
@@ -2557,7 +2552,6 @@ async function loadPedidosFromSb(){
       .from('pedidos')
       .select('*')
       .eq('empresa_id', SESS.empresaId)
-      .eq('deleted', false)
       .order('criado_em', { ascending: false });
     
     if(error) {
@@ -4607,6 +4601,14 @@ function validateSignupForm(){
 }
 
 // Submeter formulário de signup
+function genUUID(){
+  // RFC4122 v4 — compatible with Postgres uuid type
+  if(typeof crypto!=='undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+    var r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
+  });
+}
+
 async function submitSignup(){
   console.log('[v0-AUDIT] submitSignup() START');
   if(!validateSignupForm()) {
@@ -4623,7 +4625,7 @@ async function submitSignup(){
   
   try {
     // 1. Criar empresa
-    var empresaId='empr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var empresaId=genUUID();
     var empresas=stor_get(KEYS.empresas)||[];
     empresas.push({
       id:empresaId,
@@ -4640,7 +4642,7 @@ async function submitSignup(){
     var pwdHash=await hashPwd(pwd);
     
     // 3. Criar usuário admin
-    var userId='usr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var userId=genUUID();
     var users=getUsers()||[];
     users.push({
       id:userId,
@@ -11794,7 +11796,6 @@ function _rotaToSb(rotaObj){
     data:          rotaObj.data || new Date().toISOString().slice(0,10),
     obs:           rotaObj.obs || '',
     ped_ids:       JSON.stringify(rotaObj.pedIds || []),
-    deleted:       rotaObj.deleted || false,
     criado_em:     rotaObj.criadoEm || new Date().toISOString()
   };
 }
@@ -11823,7 +11824,6 @@ async function loadRotasFromSb(){
       .from('rotas')
       .select('*')
       .eq('empresa_id', SESS.empresaId)
-      .eq('deleted', false)
       .order('criado_em', { ascending: false });
     
     if(error) {
@@ -11906,7 +11906,7 @@ async function migrateDataToSb(){
   var modules = [
     { key: 'clis', table: 'clientes', name: 'Clientes', converter: _cliToSb },
     { key: 'prods', table: 'produtos', name: 'Produtos', converter: _prodToSb },
-    { key: 'peds', table: 'pedidos', name: 'Pedidos', converter: _pedToSb },
+    { key: 'peds', table: 'pedidos', name: 'Pedidos', converter: _pedidoToSb },
     { key: 'cobr', table: 'cobracas', name: 'Cobranças', converter: _cobrToSb },
     { key: 'rotas', table: 'rotas', name: 'Rotas', converter: _rotaToSb },
     { key: 'usuarios', table: 'usuarios', name: 'Usuários', converter: _usuarioToSb }
