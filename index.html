@@ -12025,8 +12025,7 @@ async function isCloudAvailable(forceCheck){
     var {error}=await _sb
       .from('empresas')
       .select('id',{count:'exact'})
-      .limit(1)
-      .timeout(3000);
+      .limit(1);
     
     APP_STATE.offline.isOnline=!error;
     APP_STATE.offline.lastCheck=now;
