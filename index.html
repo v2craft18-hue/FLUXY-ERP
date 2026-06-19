@@ -4248,6 +4248,15 @@ function showSignup(){
   go('signup');
 }
 
+function backToLogin(){
+  // Inverse of showSignup(): hide app/signup, show login screen
+  var app=document.getElementById('app'); if(app) app.className='';
+  var lw=document.getElementById('login-wrap'); if(lw) lw.style.display='flex';
+  // Clear error messages (signup + login)
+  var suErr=document.getElementById('su-err'); if(suErr){ suErr.style.display='none'; suErr.textContent=''; }
+  var loginErr=document.getElementById('login-err'); if(loginErr){ loginErr.style.display='none'; loginErr.textContent=''; }
+}
+
 function updateSidebar(){
   if(!SESS) return;
   document.getElementById('sb-nome').textContent = SESS.nome || '—';
@@ -4559,7 +4568,7 @@ function renderSignup(){
   html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px"><input id="su-terms" type="checkbox"><label for="su-terms" style="margin:0;font-size:12px">Li e aceito os Termos de Uso</label></div>';
   
   html+='<button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2)" onclick="submitSignup()">Criar Conta</button>';
-  html+='<button class="btn btn-g" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);margin-top:10px" onclick="go(\'login\')">Voltar para Login</button>';
+  html+='<button class="btn btn-g" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);margin-top:10px" onclick="backToLogin()">Voltar para Login</button>';
   
   html+='<div id="su-err" class="alert err" style="display:none;margin-top:16px"></div>';
   
