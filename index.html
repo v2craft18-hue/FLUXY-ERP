@@ -13463,8 +13463,8 @@ console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().s
 // Inicializar Supabase com env vars válidas (não hardcoded)
 if(typeof supabase !== 'undefined' && window.location.hostname !== 'localhost') {
   // URL e KEY do env vars (setadas pelo Supabase integration)
-  var SBURL = 'https://eyyttblikwpdislznuia.supabase.co';
-  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eXR0Ymxpa3dwZGlzbHpudWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjQ1MDAsImV4cCI6MjA5NjU0MDUwMH0.8i2JiV7IueZn_tw7xfFkl1nyLTHT1Wpa9bN5x7mT07o';
+  var SBURL = 'https://fxxawkgoawtuostlhnzc.supabase.co';
+  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4eGF3a2dvYXd0dW9zdGxobnpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjU3MTcsImV4cCI6MjA5NjU0MTcxN30.mWFblLMIsuzMLP_SJLRxilfpQOSQcCZk3LEtkkQaofs';
   
   try {
     window._sb = supabase.createClient(SBURL, SBKEY);
