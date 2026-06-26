@@ -3330,13 +3330,64 @@ function showResetMsg(txt,type){
     el.style.background='var(--greeng)'; el.style.border='1px solid rgba(16,185,129,.25)'; el.style.color='#6EE7B7';
   }
 }
-function doLogin(){
+async function doLogin(){
   if(!loginAllowed()) return;
   var email=(document.getElementById('lg-email').value||'').trim().toLowerCase();
   var pwd=document.getElementById('lg-pwd').value||'';
   var err=document.getElementById('login-err');
   if(err) err.style.display='none';
   if(!email||!pwd){showErr('Preencha e-mail e senha.');return;}
+  
+  // 1. Autenticação real no Supabase (estabelece sessão → RLS libera os dados da empresa)
+  if(CLOUD_ENABLED && _sb && navigator.onLine){
+    try {
+      var { data: ad, error: ae } = await _sb.auth.signInWithPassword({ email: email, password: pwd });
+      if(!ae && ad && ad.session){
+        var uid   = ad.user.id;
+        var meta  = ad.user.app_metadata || {};
+        var umeta = ad.user.user_metadata || {};
+        var empresaId = meta.empresa_id || null;
+        var role  = meta.role || 'adm';
+        var nome  = umeta.nome || email;
+        var userId = null;
+        // Buscar perfil para obter id/nome/role/empresa corretos
+        try {
+          var { data: prof } = await _sb.from('usuarios')
+            .select('id,nome,role,empresa_id,ativo,status')
+            .eq('auth_uid', uid).maybeSingle();
+          if(prof){
+            userId=prof.id; nome=prof.nome||nome; role=prof.role||role; empresaId=prof.empresa_id||empresaId;
+            if(prof.status==='desligado'){ await _sb.auth.signOut(); showErr('Seu acesso foi removido do sistema.'); return; }
+            if(prof.ativo===false||prof.status==='bloqueado'){ await _sb.auth.signOut(); showErr('Seu acesso está bloqueado. Entre em contato com o administrador.'); return; }
+          }
+        } catch(_){}
+        if(!userId) userId=uid;
+        resetLoginAttempts();
+        // Cache local para login offline futuro
+        try {
+          var pwdHash=await hashPwd(pwd);
+          var us=getUsers()||[];
+          var found=false;
+          for(var k=0;k<us.length;k++){ if(us[k].id===userId||us[k].email===email){ us[k].pwd=pwdHash; us[k].empresaId=empresaId; us[k].role=role; us[k].nome=nome; found=true; break; } }
+          if(!found) us.push({ id:userId, empresaId:empresaId, nome:nome, email:email, pwd:pwdHash, role:role, ativo:true, status:'ativo' });
+          saveUsers(us);
+        } catch(_){}
+        SESS={userId:userId,nome:nome,email:email,role:role,empresaId:empresaId,plano:'basico'};
+        APP_STATE.session=SESS;
+        APP_STATE.set('auth.logged',true);
+        APP_STATE.set('auth.role',role);
+        APP_STATE.set('auth.user',nome);
+        stor_set(KEYS.sess,SESS);
+        showApp();
+        return;
+      }
+      console.warn('[Fluxy/Login] Supabase auth falhou, tentando local:', ae && ae.message);
+    } catch(e){
+      console.warn('[Fluxy/Login] Erro Supabase auth, tentando local:', e.message);
+    }
+  }
+  
+  // 2. Fallback: autenticação local (offline ou contas legadas)
   var users=getUsers();
   // Find user by email first (case-insensitive)
   var candidate=null;
@@ -3378,6 +3429,10 @@ function showErr(msg){
 }
 
 function doLogout(){
+  // Encerra também a sessão de autenticação do Supabase
+  if(CLOUD_ENABLED && _sb && _sb.auth){
+    try { _sb.auth.signOut(); } catch(_){}
+  }
   SESS = null;
   APP_STATE.session=null;
   APP_STATE.set('auth.logged',false);
@@ -4671,6 +4726,15 @@ function genUUID(){
   });
 }
 
+function _signupErr(msg){
+  var err=document.getElementById('su-err');
+  if(err){ err.textContent=msg; err.style.display='block'; }
+}
+function _signupBtnBusy(busy){
+  var btns=document.querySelectorAll('#v-signup .btn-p');
+  if(btns&&btns[0]){ btns[0].disabled=busy; btns[0].textContent=busy?'Criando conta...':'Criar Conta'; }
+}
+
 async function submitSignup(){
   if(!validateSignupForm()) {
     return;
@@ -4683,76 +4747,77 @@ async function submitSignup(){
   var phone=(document.getElementById('su-phone').value||'').trim();
   var cnpj=(document.getElementById('su-cnpj').value||'').trim();
   
+  // O cadastro EXIGE conexão com o Supabase, pois cria a conta de autenticação real.
+  if(!(CLOUD_ENABLED && _sb && navigator.onLine)){
+    _signupErr('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
+    return;
+  }
+  
+  _signupBtnBusy(true);
+  
   try {
-    // 1. Criar empresa
-    var empresaId=genUUID();
-    var empresas=stor_get(KEYS.empresas)||[];
-    empresas.push({
-      id:empresaId,
-      nome:empresa,
-      cnpj:cnpj||null,
-      telefone:phone||null,
-      criado_em:new Date().toISOString(),
-      ativo:true
-    });
-    stor_set(KEYS.empresas,empresas);
-    console.log('[Fluxy/Signup] Empresa criada:',empresaId);
-    
-    // 2. Hash da senha
-    var pwdHash=await hashPwd(pwd);
-    
-    // 3. Criar usuário admin
-    var userId=genUUID();
-    var users=getUsers()||[];
-    users.push({
-      id:userId,
-      empresaId:empresaId,
-      nome:nome,
-      email:email,
-      pwd:pwdHash,
-      role:'adm',
-      ativo:true,
-      criado_em:new Date().toISOString(),
-      status:'ativo'
-    });
-    saveUsers(users);
-    console.log('[Fluxy/Signup] Usuário admin criado:',userId);
-    
-    // 4. Sincronizar com Supabase se online
-    if(CLOUD_ENABLED && _sb && await isCloudAvailable()){
-      try {
-        // Criar empresa no Supabase
-        var {data:emprData,error:emprErr}=await _sb.from('empresas').insert([{
-          id:empresaId,
-          nome:empresa,
-          cnpj:cnpj||null
-        }]).select().single();
-        
-        if(emprErr){
-          console.warn('[Fluxy/Signup] Erro ao criar empresa no Supabase:',emprErr.message);
-        } else {
-          // Criar usuário no Supabase
-          var {data:userData,error:userErr}=await _sb.from('usuarios').insert([{
-            id:userId,
-            empresa_id:empresaId,
-            nome:nome,
-            email:email,
-            role:'adm'
-          }]).select().single();
-          
-          if(userErr){
-            console.warn('[Fluxy/Signup] Erro ao criar usuário no Supabase:',userErr.message);
-          } else {
-            console.log('[Fluxy/Signup] Sincronizado com Supabase');
-          }
-        }
-      } catch(syncErr){
-        console.warn('[Fluxy/Signup] Erro ao sincronizar com Supabase:',syncErr.message);
-        // Continua anyway — dados estão no localStorage
+    // 1. Criar empresa + usuário admin no Supabase via Edge Function (service_role).
+    //    Esta função cria: empresa, conta auth, perfil usuario e o mapeamento auth.
+    var { data: fnData, error: fnError } = await _sb.functions.invoke('criar-empresa', {
+      body: {
+        nome_empresa: empresa,
+        cnpj:         cnpj || null,
+        email_admin:  email,
+        senha_admin:  pwd,
+        nome_admin:   nome,
+        telefone:     phone || null
       }
+    });
+    
+    // Erros retornados pela função (ex.: e-mail/CNPJ já existe) vêm no corpo da resposta
+    if(fnError || (fnData && fnData.error)){
+      var apiMsg = (fnData && fnData.error) || '';
+      var code = (fnData && fnData.code) || '';
+      var friendly = 'Não foi possível criar a conta. Tente novamente.';
+      if(code==='EMAIL_EXISTS') friendly='Este e-mail já está cadastrado no sistema.';
+      else if(code==='CNPJ_EXISTS') friendly='Este CNPJ já está cadastrado no sistema.';
+      else if(code==='INVALID_EMAIL') friendly='E-mail inválido.';
+      else if(code==='PASSWORD_TOO_SHORT') friendly='A senha deve ter no mínimo 6 caracteres.';
+      else if(apiMsg) friendly=apiMsg;
+      console.warn('[Fluxy/Signup] Edge function retornou erro:', code, apiMsg, fnError);
+      _signupErr(friendly);
+      _signupBtnBusy(false);
+      return;
     }
     
-    // 5. Auto-login
+    var empresaId = fnData.empresa_id;
+    var userId    = fnData.usuario_id;
+    console.log('[Fluxy/Signup] Conta criada no Supabase — empresa:', empresaId, '| usuário:', userId);
+    
+    // 2. Autenticar de verdade no Supabase (estabelece sessão → RLS libera leitura/escrita)
+    var { data: authData, error: authError } = await _sb.auth.signInWithPassword({
+      email: email,
+      password: pwd
+    });
+    
+    if(authError || !authData || !authData.session){
+      console.error('[Fluxy/Signup] Conta criada, mas login automático falhou:', authError && authError.message);
+      _signupErr('Conta criada! Faça login com seu e-mail e senha.');
+      _signupBtnBusy(false);
+      backToLogin();
+      return;
+    }
+    console.log('[Fluxy/Signup] Sessão Supabase ativa');
+    
+    // 3. Guardar cópia local (cache offline + fallback de login)
+    var pwdHash=await hashPwd(pwd);
+    var empresas=stor_get(KEYS.empresas)||[];
+    if(!empresas.some(function(e){return e.id===empresaId;})){
+      empresas.push({ id:empresaId, nome:empresa, cnpj:cnpj||null, telefone:phone||null, ativo:true });
+      stor_set(KEYS.empresas,empresas);
+    }
+    var users=getUsers()||[];
+    if(!users.some(function(u){return u.id===userId;})){
+      users.push({ id:userId, empresaId:empresaId, nome:nome, email:email, pwd:pwdHash, role:'adm', ativo:true, status:'ativo' });
+      saveUsers(users);
+    }
+    
+    // 4. Auto-login na sessão local (UI)
     SESS={userId:userId,nome:nome,email:email,role:'adm',empresaId:empresaId,plano:'basico'};
     APP_STATE.session=SESS;
     APP_STATE.set('auth.logged',true);
@@ -4760,16 +4825,16 @@ async function submitSignup(){
     APP_STATE.set('auth.user',nome);
     stor_set(KEYS.sess,SESS);
     
-    // 6. Mostrar app e ir para dashboard
+    // 5. Mostrar app
+    _signupBtnBusy(false);
     showApp();
     go('dashboard');
-    
-    console.log('[Fluxy/Signup] ✅ Signup completo. Auto-login e dashboard iniciados.');
+    console.log('[Fluxy/Signup] ✅ Cadastro completo e sincronizado com Supabase.');
     
   } catch(e) {
     console.error('[Fluxy/Signup] Erro fatal:',e);
-    var err=document.getElementById('su-err');
-    if(err){ err.textContent='Erro ao criar conta. Tente novamente.'; err.style.display='block'; }
+    _signupErr('Erro ao criar conta. Verifique sua conexão e tente novamente.');
+    _signupBtnBusy(false);
   }
 }
 
@@ -6726,7 +6791,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
       return b;
     }
 
-    // ── Sempre visíveis (nunca controlados pelo timer) ─────────────
+    // ���─ Sempre visíveis (nunca controlados pelo timer) ─────────────
     bw.appendChild(mkb('👁 Ver','btn-g btn-sm',function(){verPed(pid);}));
     bw.appendChild(mkb('🖨️','btn-g btn-sm',function(){printPed(pid);}));
 
@@ -13522,7 +13587,7 @@ function renderMeusClientes(){
           +'</div>'
         +'</div>'
         +'<div class="row gap4">'
-          +'<button class="btn btn-g btn-xs" data-id="'+cli.id+'" onclick="openCliModal(this.dataset.id)">✏️</button>'
+          +'<button class="btn btn-g btn-xs" data-id="'+cli.id+'" onclick="openCliModal(this.dataset.id)">✏��</button>'
           +'<button class="btn btn-p btn-xs" data-id="'+cli.id+'" onclick="nvParaCli(this.dataset.id)">🛒</button>'
         +'</div>'
       +'</div>'
@@ -13588,24 +13653,21 @@ function seed(){
 var APP_VERSION = '2.1';
 console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().slice(0,10));
 
-// ═══ STAGE FINALE: ATIVAR SUPABASE EM PRODUÇÃO ═══
-// Inicializar Supabase com env vars válidas (não hardcoded)
+// ═══ ATIVAR SUPABASE EM PRODUÇÃO ═══
+// Credenciais do projeto correto (anon key é pública por design)
 if(typeof supabase !== 'undefined' && window.location.hostname !== 'localhost') {
-  // URL e KEY do env vars (setadas pelo Supabase integration)
-  var SBURL = 'https://fxxawkgoawtuostlhnzc.supabase.co';
-  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4eGF3a2dvYXd0dW9zdGxobnpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjU3MTcsImV4cCI6MjA5NjU0MTcxN30.mWFblLMIsuzMLP_SJLRxilfpQOSQcCZk3LEtkkQaofs';
+  var SBURL = 'https://eyyttblikwpdislznuia.supabase.co';
+  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eXR0Ymxpa3dwZGlzbHpudWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjQ1MDAsImV4cCI6MjA5NjU0MDUwMH0.8i2JiV7IueZn_tw7xfFkl1nyLTHT1Wpa9bN5x7mT07o';
   
   try {
-    window._sb = supabase.createClient(SBURL, SBKEY);
-    console.log('[Fluxy] ✓ Supabase init with valid credentials - URL: ' + SBURL.substring(8,30) + '...');
-    enableCloudSync('supabase', {
-      url: SBURL,
-      key: SBKEY
+    window._sb = supabase.createClient(SBURL, SBKEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
     });
-    console.log('[Fluxy] 🚀 PRODUÇÃO: Supabase ativado com sucesso');
+    console.log('[Fluxy] ✓ Supabase init - projeto:', SBURL.substring(8,30) + '...');
+    enableCloudSync('supabase', { url: SBURL, key: SBKEY });
+    console.log('[Fluxy] 🚀 Supabase ativado');
   } catch(e) {
     console.error('[Fluxy] ✗ Supabase init failed:', e.message);
-    console.error('[Fluxy] Stack:', e.stack);
   }
 }
 
