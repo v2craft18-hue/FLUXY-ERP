@@ -1404,7 +1404,36 @@ select option {
             <button class="tab"    id="ped-per-mes"    onclick="setPedPeriod('mes')">Mês</button>
           </div>
         </div>
+        <!-- ═══ RELATÓRIO DE VENDAS (reusa relGetPeds/exportCSV/exportRelPDF) ═══ -->
+        <div class="card mb16" id="pv-relatorio">
+          <div class="row-between mb10" style="flex-wrap:wrap;gap:8px">
+            <div class="card-title">📊 Relatório de Vendas</div>
+            <button class="btn btn-g btn-xs" onclick="pvToggle()" id="pv-toggle-btn">Mostrar</button>
+          </div>
+          <div id="pv-body" style="display:none">
+            <div class="tabs mb8" style="flex-wrap:wrap">
+              <button class="tab on" id="pv-per-hoje"  onclick="pvSetPeriod('hoje')">Hoje</button>
+              <button class="tab" id="pv-per-ontem"    onclick="pvSetPeriod('ontem')">Ontem</button>
+              <button class="tab" id="pv-per-semana"   onclick="pvSetPeriod('semana')">Esta semana</button>
+              <button class="tab" id="pv-per-mes"      onclick="pvSetPeriod('mes')">Este mês</button>
+              <button class="tab" id="pv-per-personalizado" onclick="pvSetPeriod('personalizado')">Personalizado</button>
+            </div>
+            <div id="pv-custom" class="row mb10" style="display:none;gap:8px;flex-wrap:wrap">
+              <label class="fs11 t2">De <input type="date" id="pv-start" onchange="pvRender()" class="inp-date"></label>
+              <label class="fs11 t2">Até <input type="date" id="pv-end" onchange="pvRender()" class="inp-date"></label>
+            </div>
+            <div id="pv-kpis" class="row mb10" style="gap:8px;flex-wrap:wrap"></div>
+            <div id="pv-table"></div>
+            <div class="row mt10" style="gap:8px;flex-wrap:wrap">
+              <button class="btn btn-g btn-sm" onclick="pvPrint()">🖨️ Imprimir</button>
+              <button class="btn btn-g btn-sm" onclick="pvExportPDF()">📄 Exportar PDF</button>
+              <button class="btn btn-g btn-sm" onclick="pvExportCSV()">📊 Exportar CSV</button>
+            </div>
+          </div>
+        </div>
         <div id="ped-list"></div>
+
+        
       </div>
 
       <!-- PRODUTOS -->
@@ -2217,7 +2246,11 @@ function saveCobr(v){ stor_set(KEYS.cobr,v); }
 // ═══════════���═══���════════════════════════════════════════════════
 // SAAS — multi-empresa storage + helpers
 // ════════════════════════════════════════════════════════════════
-function getEmpresaId(){ return (SESS&&SESS.empresaId)||'default'; }
+function isValidUUID(v){
+  if(typeof v !== 'string') return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
+}
+function getEmpresaId(){ var e=(SESS&&SESS.empresaId)||null; return isValidUUID(e)?e:null; }
 
 function getChamados(){ return stor_get(KEYS.chamados)||[]; }
 function saveChamados(arr){ stor_set(KEYS.chamados,arr.slice(0,500)); }
@@ -2387,6 +2420,7 @@ async function _usuarioDeleteSb(id){
 }
 
 function getUsers(){ return stor_get(KEYS.users) || []; }
+function getUsersActive(){ return getUsers().filter(function(u){return !u.deleted;}); }
 function saveUsers(arr){
   if(!arr || !Array.isArray(arr)) return;
   // Safety: never overwrite existing users with fewer users unless it's a genuine delete
@@ -2559,8 +2593,16 @@ async function loadPedidosFromSb(){
       }
     }
     
+    // Dedup por id (numero) — mantém o primeiro, descarta repetidos
+    var _seen={}, _dedup=[];
+    for(var _di=0;_di<peds.length;_di++){
+      var _k=peds[_di].id||('_row'+_di);
+      if(_seen[_k]) continue;
+      _seen[_k]=true; _dedup.push(peds[_di]);
+    }
+    peds=_dedup;
     stor_set(KEYS.peds, peds);
-    console.log('[Fluxy/PED] '+peds.length+' pedidos carregados do Supabase');
+    console.log('[Fluxy/PED] '+peds.length+' pedidos carregados do Supabase (dedup)');
   } catch(e) {
     console.error('[Fluxy/PED] Erro ao loadPedidosFromSb:', e.message);
   }
@@ -2574,19 +2616,12 @@ async function _pedidoUpsertSb(pedObj){
   
   try {
     // Upsert pedido (cabeçalho)
-    var { data: pedData, error: pedErr } = pedObj.id && pedObj.id.startsWith('PED')
-      ? await _sb
-          .from('pedidos')
-          .update(sbObj)
-          .eq('numero', pedObj.id)
-          .eq('empresa_id', SESS.empresaId)
-          .select()
-          .single()
-      : await _sb
-          .from('pedidos')
-          .insert([{ ...sbObj }])
-          .select()
-          .single();
+    // Opção A: numero é TEXT (ex.: 'PED-0005'). Upsert idempotente por (empresa_id, numero).
+    var { data: pedData, error: pedErr } = await _sb
+      .from('pedidos')
+      .upsert([{ ...sbObj }], { onConflict: 'empresa_id,numero' })
+      .select()
+      .single();
     
     if(pedErr) {
       console.error('[Fluxy/PED] Erro ao upsert pedido:', pedErr.message);
@@ -2715,6 +2750,42 @@ function _cliFromSb(row){
     whatsapp:     row.whatsapp || '',
     criadoEm:     row.criado_em
   };
+}
+
+async function loadEmpresaFromSb(){
+  // Hidrata dados da empresa do Supabase no cache localStorage
+  if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  if(!isValidUUID(SESS.empresaId)) return;
+  try {
+    var { data, error } = await _sb
+      .from('empresas').select('*').eq('id', SESS.empresaId).single();
+    if(error){ console.log('[Fluxy/EMP] erro ao carregar empresa:', error.message); return; }
+    if(data){ stor_set(KEYS.empresa, data); console.log('[Fluxy/EMP] empresa carregada do Supabase'); }
+  } catch(e){ console.error('[Fluxy/EMP] loadEmpresaFromSb:', e.message); }
+}
+
+async function hydrateAllFromSb(){
+  // Estratégia A — Cache Hidratado. Supabase como fonte principal;
+  // localStorage permanece como cache/offline. Aborta sem UUID válido.
+  if(!CLOUD_ENABLED || !_sb || !SESS){
+    console.log('[Fluxy] Cloud indisponível — operando via localStorage');
+    return;
+  }
+  if(!isValidUUID(SESS && SESS.empresaId)){
+    console.warn('[Fluxy] empresaId inválido:', SESS && SESS.empresaId,
+      '- sync Supabase desativado, usando localStorage');
+    return;
+  }
+  try {
+    await loadEmpresaFromSb();
+    await loadUsuariosFromSb();
+    await loadClisFromSb();
+    await loadProdsFromSb();
+    await loadPedidosFromSb();
+    console.log('[Fluxy] Hidratação Supabase concluída');
+  } catch(e){
+    console.error('[Fluxy] hydrateAllFromSb falhou (cache preservado):', e.message);
+  }
 }
 
 async function loadClisFromSb(){
@@ -3289,7 +3360,7 @@ function doLogin(){
         saveUsers(us);
       }).catch(function(){});
     }
-    SESS={userId:candidate.id,nome:candidate.nome,email:candidate.email,role:candidate.role,empresaId:candidate.empresaId||'default',plano:candidate.plano||'basico'};
+    SESS={userId:candidate.id,nome:candidate.nome,email:candidate.email,role:candidate.role,empresaId:candidate.empresaId||null,plano:candidate.plano||'basico'};
     APP_STATE.session=SESS;
     APP_STATE.set('auth.logged',true);
     APP_STATE.set('auth.role',candidate.role);
@@ -3329,7 +3400,7 @@ function fixAccess(){
 function loadSession(){
   var s = stor_get(KEYS.sess);
   console.log('[SESSION]', s && s.userId ? 'RESTAURADA ('+s.role+')' : 'NAO_ENCONTRADA');
-  if(s && s.userId && s.role){ if(!s.empresaId) s.empresaId='default'; if(!s.plano) s.plano='basico'; SESS = s; APP_STATE.session=s; APP_STATE.set('auth.logged',true); APP_STATE.set('auth.role',s.role); APP_STATE.set('auth.user',s.nome); }
+  if(s && s.userId && s.role){ if(!isValidUUID(s.empresaId)) s.empresaId=s.empresaId||null; if(!s.plano) s.plano='basico'; SESS = s; APP_STATE.session=s; APP_STATE.set('auth.logged',true); APP_STATE.set('auth.role',s.role); APP_STATE.set('auth.user',s.nome); }
 }
 
 function isAdm(){
@@ -3821,7 +3892,7 @@ function openMetaModal(editId){
   if(!isAdm()&&!isGer()){toast('Sem permissao.'); return;}
   var metas=getMetas(); var m=null;
   if(editId) for(var i=0;i<metas.length;i++) if(metas[i].id===editId){m=metas[i];break;}
-  var users=getUsers().filter(function(u){return u.role==='vend'&&u.ativo!==false;});
+  var users=getUsersActive().filter(function(u){return u.role==='vend'&&u.ativo!==false;});
   var opts='<option value="">Todos os vendedores</option>';
   for(var i=0;i<users.length;i++) opts+='<option value="'+users[i].id+'"'+(m&&m.vendId===users[i].id?' selected':'')+'>'+(sanitize(users[i].nome||users[i].email))+'</option>';
   var html='<div class="modal-title">'+(m?'Editar':'Nova')+' Meta</div>'
@@ -4210,6 +4281,13 @@ function showApp(){
   updateSidebar();
   console.log('[v0-AUDIT] showApp() sidebar updated, calling applyRoleNav');
   applyRoleNav();
+  // Estratégia A: hidrata do Supabase e re-renderiza a view atual ao concluir.
+  // Render imediato vem do cache (localStorage); hidratação atualiza depois.
+  if(typeof hydrateAllFromSb==='function'){
+    hydrateAllFromSb().then(function(){
+      try { if(typeof currentView!=='undefined' && currentView) go(currentView); } catch(e){}
+    });
+  }
   console.log('[v0-AUDIT] showApp() calling go(dashboard)');
   go('dashboard');
   console.log('[v0-AUDIT] showApp() go(dashboard) returned, calling setTimeout fluxyLayoutDiag');
@@ -4221,6 +4299,15 @@ function showSignup(){
   document.getElementById('login-wrap').style.display = 'none';
   document.getElementById('app').className = 'visible';
   go('signup');
+}
+
+function backToLogin(){
+  // Inverse of showSignup(): hide app/signup, show login screen
+  var app=document.getElementById('app'); if(app) app.className='';
+  var lw=document.getElementById('login-wrap'); if(lw) lw.style.display='flex';
+  // Clear error messages (signup + login)
+  var suErr=document.getElementById('su-err'); if(suErr){ suErr.style.display='none'; suErr.textContent=''; }
+  var loginErr=document.getElementById('login-err'); if(loginErr){ loginErr.style.display='none'; loginErr.textContent=''; }
 }
 
 function updateSidebar(){
@@ -4534,7 +4621,7 @@ function renderSignup(){
   html+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px"><input id="su-terms" type="checkbox"><label for="su-terms" style="margin:0;font-size:12px">Li e aceito os Termos de Uso</label></div>';
   
   html+='<button class="btn btn-p" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2)" onclick="submitSignup()">Criar Conta</button>';
-  html+='<button class="btn btn-g" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);margin-top:10px" onclick="go(\'login\')">Voltar para Login</button>';
+  html+='<button class="btn btn-g" style="width:100%;justify-content:center;padding:13px;font-size:14px;border-radius:var(--r2);margin-top:10px" onclick="backToLogin()">Voltar para Login</button>';
   
   html+='<div id="su-err" class="alert err" style="display:none;margin-top:16px"></div>';
   
@@ -4576,6 +4663,14 @@ function validateSignupForm(){
 }
 
 // Submeter formulário de signup
+function genUUID(){
+  // RFC4122 v4 — compatible with Postgres uuid type
+  if(typeof crypto!=='undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,function(c){
+    var r=Math.random()*16|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
+  });
+}
+
 async function submitSignup(){
   if(!validateSignupForm()) {
     return;
@@ -4590,7 +4685,7 @@ async function submitSignup(){
   
   try {
     // 1. Criar empresa
-    var empresaId='empr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var empresaId=genUUID();
     var empresas=stor_get(KEYS.empresas)||[];
     empresas.push({
       id:empresaId,
@@ -4607,7 +4702,7 @@ async function submitSignup(){
     var pwdHash=await hashPwd(pwd);
     
     // 3. Criar usuário admin
-    var userId='usr-'+Date.now()+'-'+Math.random().toString(36).substr(2,9);
+    var userId=genUUID();
     var users=getUsers()||[];
     users.push({
       id:userId,
@@ -5614,10 +5709,6 @@ function openCliModal(editId){
         +'</select>'
       +'</div>'
 
-    +'<div class="field"><label>CHAVE PIX</label>'
-    +'<input id="emp-pix" value="'+(sanitize(emp.pixChave||''))+'" placeholder="CPF, CNPJ, email, telefone ou aleatoria"></div>'
-    +'<div class="field"><label>NOME RECEBEDOR PIX</label>'
-    +'<input id="emp-pix-rec" value="'+(sanitize(emp.pixRecebedor||''))+'" placeholder="Nome que aparece no PIX (max 25 chars)"></div>'
       // PF fields
       +'<div id="cf-pf-wrap" style="display:'+(tipo==='PF'?'block':'none')+'">'
         +'<div class="field" style="margin-bottom:0"><label>CPF</label>'
@@ -5865,7 +5956,6 @@ function openProdModal(editId){
       +'<div class="field"><label>PREÇO *</label><input id="pp-preco" type="text\" inputmode=\"decimal" value="'+(p?p.preco||'':'')+'" placeholder="0.00"></div>'
       +'<div class="field"><label>UNIDADE</label><input id="pp-un" value="'+(p?p.un||'un':'')+'" placeholder="un, kg, L..."></div>'
       +'<div class="field"><label>CATEGORIA</label><input id="pp-cat" value="'+(p?p.cat||'':'')+'" placeholder="Ex: Queijos"></div>'
-      +'<div class="field"><label>EMOJI</label><input id="pp-emoji" value="'+(p?p.emoji||'📦':'')+'" placeholder="📦"></div>'
       +'<div class="field"><label>MARCA</label><input id="pp-marca" value="'+(sanitize(p?p.marca||'':''))+'" placeholder="Ex: Qualy, Itambé"></div>'
     +'</div>'
     +'<div class="g2">'
@@ -6331,36 +6421,7 @@ function nvStep3(){
   html+='<div id="nv-resumo">'+nvResumoHtml(saleSub,disc,commVal)+'</div>';
   html+='</div>';
 
-  // Commission breakdown
-  html+='<div style="background:var(--s1);border:1px solid var(--b1);border-radius:var(--r2);padding:14px;margin-bottom:8px">';
-  html+='<div class="card-title" style="margin-bottom:10px">📊 COMISSÃO (por produto)</div>';
-  // Show product commission config — warn if using pct fallback
-  var prods=getProds();
-  var hasWrong=false;
-  for(var di=0;di<NV.cart.length;di++){
-    var dit=NV.cart[di];
-    var dprod=null;
-    for(var dj=0;dj<prods.length;dj++){if(prods[dj].id===dit.pId||prods[dj].nome===dit.nome){dprod=prods[dj];break;}}
-    if(dprod&&(dprod.commType==='caixa'||parseFloat(dprod.commMeta)>0)){
-      html+='<div style="font-size:11px;padding:8px 10px;background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:8px;margin-bottom:6px">';
-      html+='<span style="color:var(--green);font-weight:700">✅ '+sanitize(dprod.nome)+'</span>';
-      html+=' <span style="color:var(--t3)">Caixa: R$'+(dprod.commMeta||0)+'/un fixo + lucro extra acima de R$'+( dprod.preco||0)+'</span>';
-      html+='</div>';
-    } else if(dprod){
-      hasWrong=true;
-      html+='<div style="font-size:11px;padding:8px 10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;margin-bottom:6px">';
-      html+='<span style="color:#FCA5A5;font-weight:700">⚠️ '+sanitize(dprod.nome)+'</span>';
-      html+=' <span style="color:var(--t3)">usando '+(dprod.commPct||6.3)+'% — produto não configurado como Caixa</span>';
-      html+='</div>';
-    }
-  }
-  if(hasWrong&&isAdm()){
-    html+='<div style="font-size:11px;color:var(--yellow);padding:6px 8px;margin-bottom:6px">👆 Vá em <b>Produtos → ✏️ Editar</b> e selecione o tipo <b>Caixa/Meta</b> no produto.</div>';
-  } else if(hasWrong){
-    html+='<div style="font-size:11px;color:var(--yellow);padding:6px 8px;margin-bottom:6px">⚠️ Peça ao administrador para configurar a comissão por caixa neste produto.</div>';
-  }
-  html+='<div id="nv-comm-preview">'+nvCartCommHtml(NV.cart,disc)+'</div>';
-  html+='</div>';
+  // (card de comissão por produto removido da tela de Novo Pedido)
 
   html+='</div>'; // close card
 
@@ -6416,7 +6477,13 @@ function nvFinalizar(){
     origSub+=(it.precoOrig!=null?it.precoOrig:it.preco)*it.qty;
   }
   var peds=getPeds();
-  var id='PED-'+(peds.length+1).toString().padStart(4,'0');
+  // Numeração robusta: maior PED-#### existente + 1 (ignora buracos de soft-delete)
+  var _maxN=0;
+  for(var _pi=0;_pi<peds.length;_pi++){
+    var _m=/^PED-(\d+)$/.exec(peds[_pi].id||'');
+    if(_m){ var _n=parseInt(_m[1],10); if(_n>_maxN) _maxN=_n; }
+  }
+  var id='PED-'+(_maxN+1).toString().padStart(4,'0');
   var ped={
     id:id, cliId:NV.cliId, cliNome:NV.cliNome,
     itens:NV.cart, sub:saleSub, origSub:origSub, disc:disc, total:total,
@@ -6721,22 +6788,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
       }
     }
 
-    // ── Assinatura — show if cobranças linked to this pedido have signature ──
-    if(isAdm()||isGer()||isVend()){
-      var _cobrs=_cobrsCache||[];
-      var _sigCobr=null;
-      for(var _ci=0;_ci<_cobrs.length;_ci++){
-        if(_cobrs[_ci].pedId===pid&&_cobrs[_ci].assinatura){
-          _sigCobr=_cobrs[_ci]; break;
-        }
-      }
-      if(_sigCobr){
-        bw.appendChild(mkb('✍ Ver Assinatura','btn-g btn-sm',function(){
-          var cId=_sigCobr.id;
-          verAssinatura(cId);
-        }));
-      }
-    }
+    // (botão Ver Assinatura removido da aba Pedidos — assinatura fica na aba Cobranças)
     // ── Compartilhar (WhatsApp) — for ADM/GER/Vendor own orders ──
     if(isAdm()||isGer()||(isVend()&&pObj.vendId===SESS.userId)){
       bw.appendChild(mkb('📲 Pedido','btn-gr btn-sm',function(){sharePed(pid);}));
@@ -7432,7 +7484,7 @@ function printPed(id){
     +'*{box-sizing:border-box;margin:0;padding:0}'
     +'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;background:#f1f5f9;color:#111827;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     +'.wrap{max-width:794px;margin:0 auto;background:#fff;padding:28px 30px 36px}'
-    +'/* ── Table base ── */'
+    +'/* ── Table base ─�� */'
     +'table{width:100%;border-collapse:collapse}'
     +'th{background:#1e293b;color:#f8fafc;padding:9px 10px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;text-align:left;white-space:nowrap}'
     +'th.r{text-align:right}'
@@ -7953,32 +8005,29 @@ function renderEntr(){
   var peds=getPeds();
   var users=getUsers();
   var _entrNow=Date.now();
-  var _entrTodayStart=_entrNow-(_entrNow%(864e5))-new Date(_now||Date.now()).getTimezoneOffset()*60000;
+  var _entrTodayStart=_entrNow-(_entrNow%(864e5))-new Date(_entrNow||Date.now()).getTimezoneOffset()*60000;
 
   // ── ENTREGADOR: search-only mode (no list leak) ──────────────────────
-  if(isEntr()){
-    // Update sub with just a hint
-    var subEl=document.getElementById('entr-sub');
-    if(subEl) subEl.textContent='Digite o código ou nome do cliente para buscar';
-    // Ensure KPI strip is empty for entregador
-    var kpEl2=document.getElementById('entr-kpis');
-    if(kpEl2) kpEl2.innerHTML='';
-    // Hide the full list and tabs — entregador only sees the search
-    var listEl=document.getElementById('entr-list');
-    if(listEl) listEl.innerHTML='<div class="empty" style="padding:40px 0">'
-      +'<div class="empty-ico">🔍</div>'
-      +'<p style="font-weight:700;color:var(--t1);margin-bottom:6px">Buscar pedido para entrega</p>'
-      +'<p style="font-size:12px;color:var(--t3)">Digite o código (PED-0001, GER-0001) ou nome do cliente acima.</p>'
-      +'</div>';
-    return;
-  }
-
-  // ── ADM / GER / VEND: full list view ─────────────────────────────────
+  // ── ENTREGADOR: vê SOMENTE as entregas atribuídas a ele (p.entregadorId===SESS.userId) ──
+  // ── ADM / GER / VEND: lista completa ──
   var all=[];
   for(var i=0;i<peds.length;i++){
     var p=peds[i];
     if(p.status==='cancelado') continue;
+    if(isEntr() && p.entregadorId!==SESS.userId) continue; // entregador: só os seus
     all.push(p);
+  }
+  if(isEntr() && !all.length){
+    var subElE=document.getElementById('entr-sub');
+    if(subElE) subElE.textContent='Suas entregas';
+    var kpElE=document.getElementById('entr-kpis');
+    if(kpElE) kpElE.innerHTML='';
+    var listElE=document.getElementById('entr-list');
+    if(listElE) listElE.innerHTML='<div class="empty" style="padding:40px 0">'
+      +'<div class="empty-ico">📭</div>'
+      +'<p style="font-weight:700;color:var(--t1)">Nenhuma entrega atribuída para você</p>'
+      +'</div>';
+    return;
   }
   all.sort(function(a,b){return (b._ts||0)-(a._ts||0);});
 
@@ -8337,6 +8386,8 @@ function salvarCobranca(pedId){
 // RELATÓRIOS
 // ═══════════════════════════════════════════════════════════
 var relPeriod = 'mes';
+var relCustomStart = null;
+var relCustomEnd = null;
 
 function setRelPeriod(p){
   relPeriod = p;
@@ -8727,6 +8778,129 @@ function relBuildPedidosTab(peds){
   return html;
 }
 
+// ═══════════════════════════════════════════════════════════════
+// Relatório de Vendas na aba Pedidos (pv-*). Reaproveita getPeds,
+// fmt/fmtD/sanitize e a lógica de período do relGetPeds.
+// ═══════════════════════════════════════════════════════════════
+var pvPeriod = 'hoje';
+
+function pvToggle(){
+  var body=document.getElementById('pv-body');
+  var btn=document.getElementById('pv-toggle-btn');
+  if(!body) return;
+  if(body.style.display==='none'){ body.style.display='block'; if(btn)btn.textContent='Ocultar'; pvRender(); }
+  else { body.style.display='none'; if(btn)btn.textContent='Mostrar'; }
+}
+
+function pvSetPeriod(p){
+  pvPeriod=p;
+  ['hoje','ontem','semana','mes','personalizado'].forEach(function(k){
+    var el=document.getElementById('pv-per-'+k); if(el) el.className='tab'+(k===p?' on':'');
+  });
+  var cust=document.getElementById('pv-custom'); if(cust) cust.style.display=(p==='personalizado'?'flex':'none');
+  pvRender();
+}
+
+// Filtra pedidos pelo período pv + respeita o papel (vendedor vê só os seus)
+function pvGetPeds(){
+  var all=getPeds(); var now=new Date(); var out=[];
+  for(var i=0;i<all.length;i++){
+    var p=all[i];
+    if(p.deleted) continue;
+    if(p.paraGerente) continue;
+    if(isVend() && p.vendId!==SESS.userId) continue;
+    var d=new Date(Date.parse(p.criadoEm||0));
+    if(pvPeriod==='hoje'){ if(d.toDateString()!==now.toDateString()) continue; }
+    else if(pvPeriod==='ontem'){ var y=new Date(now); y.setDate(y.getDate()-1); if(d.toDateString()!==y.toDateString()) continue; }
+    else if(pvPeriod==='semana'){ if(now-d>7*864e5) continue; }
+    else if(pvPeriod==='mes'){ if(d.getMonth()!==now.getMonth()||d.getFullYear()!==now.getFullYear()) continue; }
+    else if(pvPeriod==='personalizado'){
+      var se=document.getElementById('pv-start'), ee=document.getElementById('pv-end');
+      var s=se&&se.value?new Date(se.value):null, e=ee&&ee.value?new Date(ee.value):null;
+      if(e) e.setHours(23,59,59,999);
+      if(s&&d<s) continue; if(e&&d>e) continue;
+    }
+    out.push(p);
+  }
+  return out;
+}
+
+function pvRender(){
+  var peds=pvGetPeds();
+  var users=getUsers();
+  var totVal=0, clientes={};
+  for(var i=0;i<peds.length;i++){ totVal+=(peds[i].total||0); if(peds[i].cliId) clientes[peds[i].cliId]=1; }
+  var qtd=peds.length;
+  var nCli=Object.keys(clientes).length;
+  var ticket=qtd?totVal/qtd:0;
+
+  var kpiEl=document.getElementById('pv-kpis');
+  if(kpiEl){
+    kpiEl.innerHTML=''
+      +pvKpi('PEDIDOS', qtd)
+      +pvKpi('TOTAL VENDIDO', fmt(totVal))
+      +pvKpi('TICKET MÉDIO', fmt(ticket))
+      +pvKpi('CLIENTES', nCli);
+  }
+
+  var tEl=document.getElementById('pv-table');
+  if(tEl){
+    if(!peds.length){ tEl.innerHTML='<div class="empty" style="padding:20px"><p>Nenhuma venda no período.</p></div>'; return; }
+    var rows='';
+    for(var j=0;j<peds.length;j++){
+      var p=peds[j]; var vn='—';
+      for(var u=0;u<users.length;u++) if(users[u].id===p.vendId){ vn=users[u].nome; break; }
+      rows+='<tr>'
+        +'<td class="mono fs11">'+sanitize(p.id||'')+'</td>'
+        +'<td class="fs11">'+fmtD(p.criadoEm)+'</td>'
+        +'<td class="fs11">'+sanitize(p.cliNome||'')+'</td>'
+        +'<td class="fs11">'+sanitize(vn)+'</td>'
+        +'<td class="fs11 mono" style="text-align:right">'+fmt(p.total||0)+'</td>'
+        +'<td class="fs11">'+sanitize(p.status||'')+'</td>'
+        +'</tr>';
+    }
+    tEl.innerHTML='<div style="overflow-x:auto"><table class="tbl" style="width:100%;font-size:11px">'
+      +'<thead><tr><th>Pedido</th><th>Data</th><th>Cliente</th><th>Vendedor</th>'
+      +'<th style="text-align:right">Valor</th><th>Status</th></tr></thead>'
+      +'<tbody>'+rows+'</tbody></table></div>';
+  }
+}
+
+function pvKpi(label,val){
+  return '<div style="flex:1;min-width:120px;background:var(--s2);border-radius:10px;padding:10px 12px">'
+    +'<div class="fs10 t3 mb1">'+label+'</div>'
+    +'<div class="fw8" style="font-size:17px;color:var(--green)">'+val+'</div></div>';
+}
+
+// Imprimir / PDF: reaproveita a janela de impressão; CSV reaproveita o padrão de exportCSV
+function pvPrint(){
+  var peds=pvGetPeds(), users=getUsers();
+  var rows='';
+  for(var i=0;i<peds.length;i++){ var p=peds[i]; var vn='—';
+    for(var u=0;u<users.length;u++) if(users[u].id===p.vendId){vn=users[u].nome;break;}
+    rows+='<tr><td>'+(p.id||'')+'</td><td>'+fmtD(p.criadoEm)+'</td><td>'+(p.cliNome||'')+'</td><td>'+vn+'</td><td>'+fmt(p.total||0)+'</td><td>'+(p.status||'')+'</td></tr>';
+  }
+  var w=window.open('','_blank');
+  if(!w){ toast('Permita pop-ups para imprimir.','err'); return; }
+  w.document.write('<html><head><title>Relatório de Vendas</title><style>body{font-family:Arial;padding:20px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #ccc;padding:6px;font-size:12px;text-align:left}</style></head><body>'
+    +'<h2>Relatório de Vendas</h2><table><thead><tr><th>Pedido</th><th>Data</th><th>Cliente</th><th>Vendedor</th><th>Valor</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></body></html>');
+  w.document.close(); w.focus(); setTimeout(function(){w.print();},300);
+}
+
+function pvExportPDF(){ pvPrint(); /* mesma janela de impressão → Salvar como PDF */ }
+
+function pvExportCSV(){
+  var peds=pvGetPeds(), users=getUsers();
+  var rows=['Pedido,Data,Cliente,Vendedor,Valor,Status'];
+  for(var i=0;i<peds.length;i++){ var p=peds[i]; var vn='';
+    for(var u=0;u<users.length;u++) if(users[u].id===p.vendId){vn=users[u].nome;break;}
+    rows.push('"'+(p.id||'')+'","'+fmtD(p.criadoEm)+'","'+(p.cliNome||'').replace(/"/g,'')+'","'+vn.replace(/"/g,'')+'","'+(p.total||0)+'","'+(p.status||'')+'"');
+  }
+  var a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(rows.join('\n'));
+  a.download='relatorio-vendas.csv'; a.click();
+}
+
 function exportCSV(){
   var peds=relGetPeds();
   var rows=['Pedido,Cliente,Valor,Status,Data'];
@@ -8977,7 +9151,7 @@ function exportCommCSV(){
 
 function exportCommPDF(){
   var peds=getPeds();
-  var users=getUsers();
+  var users=getUsersActive();
   var range=getCommDateRange();
   var allVends=[];
   for(var i=0;i<users.length;i++) if(users[i].role==='vend') allVends.push(users[i]);
@@ -9085,6 +9259,7 @@ function renderComm(){
   var _now=Date.now();
   var peds=getPeds();
   var users=getUsers();
+  var usersAtivos=getUsersActive();
   var el=document.getElementById('comm-body');
   if(!el) return;
 
@@ -9094,7 +9269,7 @@ function renderComm(){
 
   // Build vendedores list
   var allVends=[];
-  for(var i=0;i<users.length;i++) if(users[i].role==='vend') allVends.push(users[i]);
+  for(var i=0;i<usersAtivos.length;i++) if(usersAtivos[i].role==='vend') allVends.push(usersAtivos[i]);
   var vends=isVend()?allVends.filter(function(u){return u.id===SESS.userId;}):allVends;
 
   // Filter peds by period
@@ -9625,7 +9800,7 @@ function getGerPeds(){
 }
 
 function nvEnviarGerente(){
-  var users=getUsers();
+  var users=getUsersActive();
   var gerentes=[];
   for(var i=0;i<users.length;i++){
     var r=(users[i].role||'').toLowerCase();
@@ -10211,7 +10386,7 @@ function cobrApplyCustom(){
 }
 
 function cobrGetDateRange(){
-  var preset=_FLUXI_UI.cobr.period||'30d';
+  var preset=_FLUXI_UI.cobr.period||'all';
   var dateType=(document.getElementById('cobr-date-type')||{value:'criadoEm'}).value||'criadoEm';
   var now=new Date();
   // Remove time component for day-level comparisons
@@ -10828,6 +11003,7 @@ function renderCobr(){
   if(!el) return;
   var cobrs=getCobr();
   var users=getUsers();
+  var usersAtivos=getUsersActive();
   var q=(document.getElementById('cobr-q')||{value:''}).value.toLowerCase().trim();
 
   // Populate + apply vendor filter (ADM/GER only)
@@ -10839,6 +11015,9 @@ function renderCobr(){
     var seenVends={};
     for(var vi=0;vi<cobrs.length;vi++){
       var vId=cobrs[vi].vendId||''; if(!vId||seenVends[vId]) continue; seenVends[vId]=1;
+      // oculta vendedor deletado do filtro (mas mantém histórico no card)
+      var _vendAtivo=false; for(var va=0;va<usersAtivos.length;va++) if(usersAtivos[va].id===vId){_vendAtivo=true;break;}
+      if(!_vendAtivo) continue;
       var vNm='—'; for(var vj=0;vj<users.length;vj++) if(users[vj].id===vId){vNm=users[vj].nome;break;}
       vendOpts+='<option value="'+vId+'">'+sanitize(vNm)+'</option>';
     }
@@ -10852,7 +11031,7 @@ function renderCobr(){
   var _now=Date.now();
   var dateRange=cobrGetDateRange();
   // ADM/GER default to 'all' so they never miss cobranças; vend defaults to 30d
-  var cobrPeriod=_FLUXI_UI.cobr.period||(isAdm()||isGer()?'all':'30d');
+  var cobrPeriod=_FLUXI_UI.cobr.period||'all';
 
   // Sync quick-filter button active states
   var qPresets=['today','ontem','7d','15d','30d','mes','all','custom'];
@@ -10870,7 +11049,7 @@ function renderCobr(){
   if(dateRange.start){
     mine=mine.filter(function(x){
       var fieldVal=x[dateRange.dateType]||x.criadoEm;
-      if(!fieldVal) return false;
+      if(!fieldVal) return true;
       var _d=Date.parse(fieldVal||0)||0;
       return _d>=dateRange.start.getTime()&&_d<=dateRange.end.getTime();
     });
@@ -10935,7 +11114,7 @@ function renderCobr(){
 
   var subEl=document.getElementById('cobr-sub');
   var nPendTotal=nPend+nAtr+nAguard;
-  if(subEl) subEl.textContent=mine.length+' nota'+(mine.length!==1?'s':'')+' · '+fmt(valTotal)+' total · '+fmt(valPago)+' recebido · '+fmt(valPend+valAguard)+' a receber'+(nAtuard?' · '+nAguard+' aguard. ger':'');
+  if(subEl) subEl.textContent=mine.length+' nota'+(mine.length!==1?'s':'')+' · '+fmt(valTotal)+' total · '+fmt(valPago)+' recebido · '+fmt(valPend+valAguard)+' a receber'+(nAguard?' · '+nAguard+' aguard. ger':'');
 
   // Filter by tab + search
   var list=mine;
@@ -10954,7 +11133,16 @@ function renderCobr(){
 
   el.innerHTML='';
   if(!list.length){
-    el.innerHTML='<div class="empty"><div class="empty-ico">💸</div><p>Nenhuma cobrança'+(q?' para "'+q+'"':'')+'.</p></div>';
+    // UX: informar quantas cobranças existem nas OUTRAS abas (sem alterar KPI/getCobrStatus)
+    var _tabLabel={pendente:'pendente',atrasado:'atrasada',pago:'paga',aguardando_confirmacao:'aguardando confirmação'}[cobrTab]||'';
+    var _emptyMsg='Nenhuma cobrança'+(_tabLabel?' '+_tabLabel:'')+(q?' para "'+q+'"':'')+' encontrada.';
+    var _outras=[];
+    if(cobrTab!=='pendente'&&nPend>0) _outras.push(nPend+' pendente'+(nPend!==1?'s':''));
+    if(cobrTab!=='atrasado'&&nAtr>0) _outras.push(nAtr+' atrasada'+(nAtr!==1?'s':''));
+    if(cobrTab!=='aguardando_confirmacao'&&nAguard>0) _outras.push(nAguard+' aguardando confirmação');
+    if(cobrTab!=='pago'&&nPago>0) _outras.push(nPago+' paga'+(nPago!==1?'s':''));
+    var _hint=_outras.length?'<p class="fs12 t3 mt6">Existem '+_outras.join(', ')+' em outras abas.</p>':'';
+    el.innerHTML='<div class="empty"><div class="empty-ico">💸</div><p>'+_emptyMsg+'</p>'+_hint+'</div>';
     return;
   }
 
@@ -11033,6 +11221,46 @@ function renderCobr(){
     pdfBtn.setAttribute('data-id',cobr.id);
     pdfBtn.onclick=function(){printCobr(this.getAttribute('data-id'));};
     bw.appendChild(pdfBtn);
+
+    // ── Bloco NF — reaproveita emitirNF/solicitarNF/printDanfe (sem fluxo novo) ──
+    var _nfPed=null, _allPeds=getPeds();
+    for(var _np=0;_np<_allPeds.length;_np++){ if(_allPeds[_np].id===cobr.pedId){ _nfPed=_allPeds[_np]; break; } }
+    if(!_nfPed){
+      // Pedido órfão — vínculo da cobrança quebrado
+      var nfWarn=document.createElement('span');
+      nfWarn.style.cssText='font-size:11px;font-weight:700;color:#FCA5A5;padding:4px 8px;background:rgba(239,68,68,.1);border-radius:8px;display:inline-block';
+      nfWarn.innerHTML='⚠ Pedido não encontrado — verifique vínculo da cobrança';
+      bw.appendChild(nfWarn);
+    } else {
+      var _nfApproved=(_nfPed.status==='aprovado'||_nfPed.status==='aprovado_ger'||_nfPed.status==='nota_fiscal');
+      if(_nfPed.nfNumero){
+        // NF já emitida → Ver NF (todos os papéis)
+        var nfBtn=document.createElement('button');
+        nfBtn.className='btn btn-g btn-sm'; nfBtn.style.flex='1';
+        nfBtn.innerHTML='📄 Ver NF';
+        nfBtn.setAttribute('data-ped',cobr.pedId);
+        nfBtn.onclick=function(){printDanfe(this.getAttribute('data-ped'));};
+        bw.appendChild(nfBtn);
+      } else if(_nfApproved){
+        if(isAdm()||isGer()){
+          // ADM/GER → Emitir NF
+          var emBtn=document.createElement('button');
+          emBtn.className='btn btn-y btn-sm'; emBtn.style.flex='1';
+          emBtn.innerHTML='📄 Emitir NF';
+          emBtn.setAttribute('data-ped',cobr.pedId);
+          emBtn.onclick=function(){emitirNF(this.getAttribute('data-ped'));};
+          bw.appendChild(emBtn);
+        } else if(isVend()&&_nfPed.vendId===SESS.userId){
+          // Vendedor dono → Solicitar NF
+          var soBtn=document.createElement('button');
+          soBtn.className='btn btn-g btn-sm'; soBtn.style.flex='1';
+          soBtn.innerHTML='📨 Solicitar NF';
+          soBtn.setAttribute('data-ped',cobr.pedId);
+          soBtn.onclick=function(){solicitarNF(this.getAttribute('data-ped'));};
+          bw.appendChild(soBtn);
+        }
+      }
+    }
     // Payment action buttons — role-aware 3-step flow
     if(st==='pendente'||st==='atrasado'){
       // STEP 1: Vendor informs payment received
@@ -11082,6 +11310,15 @@ function renderCobr(){
   }
   } catch(err){
     console.error('[Fluxy] renderCobr error:',err);
+    // Mostra o erro na tela em vez de deixar em branco silenciosamente
+    try {
+      var _elErr=document.getElementById('cobr-list');
+      if(_elErr) _elErr.innerHTML='<div class="card" style="border-left:3px solid #EF4444">'
+        +'<div class="fw8 mb6" style="color:#EF4444">⚠ Erro ao montar a lista de cobranças</div>'
+        +'<div class="fs12 t2" style="font-family:monospace;white-space:pre-wrap">'+sanitize(String(err&&err.message||err))+'</div>'
+        +'<div class="fs11 t3 mt6">Mande print desta mensagem para o suporte.</div>'
+        +'</div>';
+    } catch(e2){}
   }
 }
 
@@ -11369,7 +11606,7 @@ function renderUsuarios(){
   // View guard: abort if user navigated away
   if(currentView!=='usuarios') return;
   if(!isAdm()){go('dashboard');return;}
-  var users=getUsers();
+  var users=getUsers().filter(function(u){return !u.deleted;});
   var list=[];
   for(var i=0;i<users.length;i++){
     var u=users[i];
@@ -11760,7 +11997,6 @@ function _rotaToSb(rotaObj){
     data:          rotaObj.data || new Date().toISOString().slice(0,10),
     obs:           rotaObj.obs || '',
     ped_ids:       JSON.stringify(rotaObj.pedIds || []),
-    deleted:       rotaObj.deleted || false,
     criado_em:     rotaObj.criadoEm || new Date().toISOString()
   };
 }
@@ -11799,7 +12035,7 @@ async function migrateDataToSb(){
   var modules = [
     { key: 'clis', table: 'clientes', name: 'Clientes', converter: _cliToSb },
     { key: 'prods', table: 'produtos', name: 'Produtos', converter: _prodToSb },
-    { key: 'peds', table: 'pedidos', name: 'Pedidos', converter: _pedToSb },
+    { key: 'peds', table: 'pedidos', name: 'Pedidos', converter: _pedidoToSb },
     { key: 'cobr', table: 'cobracas', name: 'Cobranças', converter: _cobrToSb },
     { key: 'rotas', table: 'rotas', name: 'Rotas', converter: _rotaToSb },
     { key: 'usuarios', table: 'usuarios', name: 'Usuários', converter: _usuarioToSb }
@@ -11909,8 +12145,7 @@ async function isCloudAvailable(forceCheck){
     var {error}=await _sb
       .from('empresas')
       .select('id',{count:'exact'})
-      .limit(1)
-      .timeout(3000);
+      .limit(1);
     
     APP_STATE.offline.isOnline=!error;
     APP_STATE.offline.lastCheck=now;
@@ -12156,7 +12391,7 @@ function openRotaModal(editId){
   editId=editId||null;
   var rs=getRotas(); var rota=null;
   if(editId) for(var i=0;i<rs.length;i++) if(rs[i].id===editId){rota=rs[i];break;}
-  var users=getUsers();
+  var users=getUsersActive();
   var entrs=[]; for(var i=0;i<users.length;i++) if(users[i].role==='entr') entrs.push(users[i]);
   var entrOpts='<option value="">— Selecionar —</option>';
   for(var i=0;i<entrs.length;i++) entrOpts+='<option value="'+entrs[i].id+'"'+(rota&&rota.entregadorId===entrs[i].id?' selected':'')+'>'+sanitize(entrs[i].nome)+'</option>';
@@ -12407,7 +12642,7 @@ function openRotaMaps(rotaId){
 
 function buildRotaList(peds,clis){
   var _entrNow=Date.now();
-  var _entrTodayStart=_entrNow-(_entrNow%(864e5))-new Date(_now||Date.now()).getTimezoneOffset()*60000;
+  var _entrTodayStart=_entrNow-(_entrNow%(864e5))-new Date(_entrNow||Date.now()).getTimezoneOffset()*60000;
   var list=[];
   for(var i=0;i<peds.length;i++){
     var p=peds[i];
@@ -12415,7 +12650,7 @@ function buildRotaList(peds,clis){
     if(isEntr()&&p.entregadorId&&p.entregadorId!==SESS.userId) continue;
     if(rotaEntrFilter&&p.entregadorId!==rotaEntrFilter) continue;
     var es=p.entregaStatus||'pendente';
-    if(rotaTab==='hoje'&&Date.parse(p.criadoEm||0)<today.getTime()) continue;
+    if(rotaTab==='hoje'&&Date.parse(p.criadoEm||0)<_entrTodayStart) continue;
     if(rotaTab==='pendente'&&es!=='pendente') continue;
     if(rotaTab==='em_rota'&&es!=='em_rota') continue;
     if(rotaTab==='entregue'&&es!=='entregue') continue;
@@ -12456,7 +12691,7 @@ function renderRotasMgmt(){
   mgmtEl.style.display='block';
   var delivEl=document.getElementById('rota-delivery-panel');
   if(delivEl) delivEl.style.display='none';
-  var rs=getRotas();
+  var rs=getRotas().filter(function(r){return !r.deleted;});
   var users=getUsers();
   var peds=getPeds();
   var nAberta=0,nAndamento=0,nFinal=0,nPedRota=0;
@@ -12565,14 +12800,15 @@ function renderRotas(){
   var peds=getPeds();
   var clis=getClis();
   var users=getUsers();
+  var usersAtivos=getUsersActive();
   var _entrNow=Date.now();
-  var _entrTodayStart=_entrNow-(_entrNow%(864e5))-new Date(_now||Date.now()).getTimezoneOffset()*60000;
+  var _entrTodayStart=_entrNow-(_entrNow%(864e5))-new Date(_entrNow||Date.now()).getTimezoneOffset()*60000;
 
   // ADM: show entregador selector
   var selWrap=document.getElementById('rota-entr-selector');
   if(selWrap&&isAdm()){
     selWrap.style.display='block';
-    var entrs=[]; for(var i=0;i<users.length;i++) if(users[i].role==='entr') entrs.push(users[i]);
+    var entrs=[]; for(var i=0;i<usersAtivos.length;i++) if(usersAtivos[i].role==='entr') entrs.push(usersAtivos[i]);
     var selHtml='<div class="row gap8" style="flex-wrap:wrap;align-items:center">'
       +'<span class="fs12 t2 fw6">Entregador:</span>'
       +'<select id="rota-entr-sel" onchange="setRotaEntr(this.value||null)" style="background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);color:var(--t1);padding:7px 12px;font-size:12px;font-family:inherit;outline:none">'
@@ -12588,7 +12824,7 @@ function renderRotas(){
   var allToday=peds.filter(function(p2){
     if(p2.status==='cancelado') return false;
     if(isEntr()&&p2.entregadorId&&p2.entregadorId!==SESS.userId) return false;
-    return Date.parse(p2.criadoEm||0)>=today.getTime();
+    return Date.parse(p2.criadoEm||0)>=_entrTodayStart;
   });
   var nPend=0,nRota=0,nEntr=0;
   for(var i=0;i<allToday.length;i++){
@@ -13356,8 +13592,8 @@ console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().s
 // Inicializar Supabase com env vars válidas (não hardcoded)
 if(typeof supabase !== 'undefined' && window.location.hostname !== 'localhost') {
   // URL e KEY do env vars (setadas pelo Supabase integration)
-  var SBURL = 'https://eyyttblikwpdislznuia.supabase.co';
-  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eXR0Ymxpa3dwZGlzbHpudWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjQ1MDAsImV4cCI6MjA5NjU0MDUwMH0.8i2JiV7IueZn_tw7xfFkl1nyLTHT1Wpa9bN5x7mT07o';
+  var SBURL = 'https://fxxawkgoawtuostlhnzc.supabase.co';
+  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4eGF3a2dvYXd0dW9zdGxobnpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjU3MTcsImV4cCI6MjA5NjU0MTcxN30.mWFblLMIsuzMLP_SJLRxilfpQOSQcCZk3LEtkkQaofs';
   
   try {
     window._sb = supabase.createClient(SBURL, SBKEY);
