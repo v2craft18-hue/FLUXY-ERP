@@ -2129,8 +2129,7 @@ function _cobrToSb(cobrObj){
     status:          cobrObj.status || 'aberta',
     vencimento:      cobrObj.vencimento || null,
     pago_em:         cobrObj.pagoEm || null,
-    obs:             cobrObj.obs || '',
-    criado_em:       cobrObj.criadoEm || new Date().toISOString()
+    obs:             cobrObj.obs || ''
   };
 }
 
@@ -2155,7 +2154,6 @@ async function _cobrFromSb(row){
     vencimento:     row.vencimento || null,
     pagoEm:         row.pago_em || null,
     obs:            row.obs || '',
-    deleted:        row.deleted || false,
     criadoEm:       row.criado_em
   };
 }
@@ -2329,11 +2327,7 @@ function _usuarioToSb(userObj){
     nome:          userObj.nome || '',
     email:         userObj.email || '',
     role:          userObj.role || 'vend',
-    tipo_usuario:  userObj.tipo_usuario || '',
-    ativo:         userObj.ativo !== false,
-    telefone:      userObj.telefone || '',
-    status:        userObj.status || 'ativo',
-    criado_em:     userObj.criadoEm || new Date().toISOString()
+    telefone:      userObj.telefone || ''
   };
 }
 
@@ -2345,12 +2339,7 @@ async function _usuarioFromSb(row){
     nome:          row.nome || '',
     email:         row.email || '',
     role:          row.role || 'vend',
-    tipo_usuario:  row.tipo_usuario || '',
-    ativo:         row.ativo !== false,
-    telefone:      row.telefone || '',
-    status:        row.status || 'ativo',
-    deleted:       row.deleted || false,
-    criadoEm:      row.criado_em
+    telefone:      row.telefone || ''
   };
 }
 
@@ -2361,11 +2350,10 @@ async function loadUsuariosFromSb(){
     var { data, error } = await _sb
       .from('usuarios')
       .select('*')
-      .eq('empresa_id', SESS.empresaId)
-      .order('criado_em', { ascending: false });
+      .eq('empresa_id', SESS.empresaId);
     
     if(error) {
-      console.log('[Fluxy/USU] RLS ou erro ao carregar usuários:', error.message);
+      console.log('[Fluxy/USU] Erro ao carregar usuários:', error.message);
       return;
     }
     
@@ -2522,8 +2510,7 @@ function _pedidoToSb(pedObj){
     nf_numero:    pedObj.nfNumero || '',
     nf_status:    pedObj.nfStatus || null,
     comissao:     pedObj.commVal || 0,
-    solicitar_nf: pedObj.solicitarNF || false,
-    criado_em:    pedObj.criadoEm || new Date().toISOString()
+    solicitar_nf: pedObj.solicitarNF || false
   };
 }
 
@@ -2545,7 +2532,6 @@ function _pedidoFromSb(row){
     nfStatus:     row.nf_status || null,
     commVal:      row.comissao || 0,
     solicitarNF:  row.solicitar_nf || false,
-    deleted:      row.deleted || false,
     criadoEm:     row.criado_em
   };
 }
@@ -2585,8 +2571,7 @@ async function loadPedidosFromSb(){
     var { data, error } = await _sb
       .from('pedidos')
       .select('*')
-      .eq('empresa_id', SESS.empresaId)
-      .order('criado_em', { ascending: false });
+      .eq('empresa_id', SESS.empresaId);
     
     if(error) {
       console.log('[Fluxy/PED] RLS ou erro ao carregar pedidos:', error.message);
@@ -2727,7 +2712,6 @@ function _cliToSb(cliObj){
     tabela_preco: cliObj.tabelaPreco || 'padrao',
     desconto_max: cliObj.descontoMax || 0,
     vend_id:      cliObj.vendId || '',
-    ativo:        cliObj.ativo !== false,
     whatsapp:     cliObj.whatsapp || ''
   };
 }
@@ -2811,8 +2795,7 @@ async function loadClisFromSb(){
     var { data, error } = await _sb
       .from('clientes')
       .select('*')
-      .eq('empresa_id', SESS.empresaId)
-      .eq('ativo', true);
+      .eq('empresa_id', SESS.empresaId);
     
     if(error) {
       console.log('[Fluxy/CLI] RLS ou erro ao carregar clientes:', error.message);
@@ -2866,8 +2849,7 @@ async function _cliUpsertSb(cliObj){
     console.log('[Fluxy/Supabase] ✓ Cliente salvo:', cliObj.id, cliObj.nome);
     APP_STATE.migration_report.migrada++;
     stor_set(KEYS.clis, data);
-    console.log('[Fluxy/CLI] Cliente '+cliObj.id+' salvo no Supabase');
-    return data ? _cliFromSb(data) : null;
+    return data;
   } catch(e) {
     console.error('[Fluxy/CLI] Erro inesperado em _cliUpsertSb:', e.message);
     // Enfileirar em caso de erro
@@ -2929,7 +2911,6 @@ function _prodToSb(prodObj){
     estoque_reservado: prodObj.estReservado || 0,
     peso_bruto:   prodObj.peso ? parseFloat(prodObj.peso) : 0,
     peso_liq:     prodObj.pesoLiq || 0,
-    ativo:        prodObj.ativo !== false,
     origem:       prodObj.origem || '0'
   };
 }
@@ -2977,8 +2958,7 @@ async function loadProdsFromSb(){
     var { data, error } = await _sb
       .from('produtos')
       .select('*')
-      .eq('empresa_id', SESS.empresaId)
-      .eq('ativo', true);
+      .eq('empresa_id', SESS.empresaId);
     
     if(error) {
       console.log('[Fluxy/PROD] RLS ou erro ao carregar produtos:', error.message);
@@ -3128,7 +3108,7 @@ function saveCommCfg(cfg){ stor_set(KEYS.comm, cfg); }
 
 // ═══════════════════════════════════════════════════════════
 // AUTH
-// ═══════════════════════════════════════════════════════════
+// ══════════════════���════════════════════════════════════════
 var SESS = null;
 
 function hashPwd(p){
@@ -3350,13 +3330,64 @@ function showResetMsg(txt,type){
     el.style.background='var(--greeng)'; el.style.border='1px solid rgba(16,185,129,.25)'; el.style.color='#6EE7B7';
   }
 }
-function doLogin(){
+async function doLogin(){
   if(!loginAllowed()) return;
   var email=(document.getElementById('lg-email').value||'').trim().toLowerCase();
   var pwd=document.getElementById('lg-pwd').value||'';
   var err=document.getElementById('login-err');
   if(err) err.style.display='none';
   if(!email||!pwd){showErr('Preencha e-mail e senha.');return;}
+  
+  // 1. Autenticação real no Supabase (estabelece sessão → RLS libera os dados da empresa)
+  if(CLOUD_ENABLED && _sb && navigator.onLine){
+    try {
+      var { data: ad, error: ae } = await _sb.auth.signInWithPassword({ email: email, password: pwd });
+      if(!ae && ad && ad.session){
+        var uid   = ad.user.id;
+        var meta  = ad.user.app_metadata || {};
+        var umeta = ad.user.user_metadata || {};
+        var empresaId = meta.empresa_id || null;
+        var role  = meta.role || 'adm';
+        var nome  = umeta.nome || email;
+        var userId = null;
+        // Buscar perfil para obter id/nome/role/empresa corretos
+        try {
+          var { data: prof } = await _sb.from('usuarios')
+            .select('id,nome,role,empresa_id,ativo,status')
+            .eq('auth_uid', uid).maybeSingle();
+          if(prof){
+            userId=prof.id; nome=prof.nome||nome; role=prof.role||role; empresaId=prof.empresa_id||empresaId;
+            if(prof.status==='desligado'){ await _sb.auth.signOut(); showErr('Seu acesso foi removido do sistema.'); return; }
+            if(prof.ativo===false||prof.status==='bloqueado'){ await _sb.auth.signOut(); showErr('Seu acesso está bloqueado. Entre em contato com o administrador.'); return; }
+          }
+        } catch(_){}
+        if(!userId) userId=uid;
+        resetLoginAttempts();
+        // Cache local para login offline futuro
+        try {
+          var pwdHash=await hashPwd(pwd);
+          var us=getUsers()||[];
+          var found=false;
+          for(var k=0;k<us.length;k++){ if(us[k].id===userId||us[k].email===email){ us[k].pwd=pwdHash; us[k].empresaId=empresaId; us[k].role=role; us[k].nome=nome; found=true; break; } }
+          if(!found) us.push({ id:userId, empresaId:empresaId, nome:nome, email:email, pwd:pwdHash, role:role, ativo:true, status:'ativo' });
+          saveUsers(us);
+        } catch(_){}
+        SESS={userId:userId,nome:nome,email:email,role:role,empresaId:empresaId,plano:'basico'};
+        APP_STATE.session=SESS;
+        APP_STATE.set('auth.logged',true);
+        APP_STATE.set('auth.role',role);
+        APP_STATE.set('auth.user',nome);
+        stor_set(KEYS.sess,SESS);
+        showApp();
+        return;
+      }
+      console.warn('[Fluxy/Login] Supabase auth falhou, tentando local:', ae && ae.message);
+    } catch(e){
+      console.warn('[Fluxy/Login] Erro Supabase auth, tentando local:', e.message);
+    }
+  }
+  
+  // 2. Fallback: autenticação local (offline ou contas legadas)
   var users=getUsers();
   // Find user by email first (case-insensitive)
   var candidate=null;
@@ -3398,6 +3429,10 @@ function showErr(msg){
 }
 
 function doLogout(){
+  // Encerra também a sessão de autenticação do Supabase
+  if(CLOUD_ENABLED && _sb && _sb.auth){
+    try { _sb.auth.signOut(); } catch(_){}
+  }
   SESS = null;
   APP_STATE.session=null;
   APP_STATE.set('auth.logged',false);
@@ -3905,7 +3940,7 @@ function saveBancario(obj){
 }
 
 
-// ── Metas + Ranking ───────────────────────────────────────────────────
+// ── Metas + Ranking ────���──────────────────────────────────────────────
 function getMetas(){ return stor_get('fz_metas')||[]; }
 function saveMetas(arr){ stor_set('fz_metas',arr); }
 function openMetaModal(editId){
@@ -4231,11 +4266,6 @@ function syncCloud(key, data){
       case 'cobr':
         if(APP_STATE.migration_state.cobr || stor_get(KEYS.cobr) && stor_get(KEYS.cobr).length > 0) {
           loadCobrFromSb();
-        }
-        break;
-      case 'rotas':
-        if(APP_STATE.migration_state.rotas || stor_get(KEYS.rotas) && stor_get(KEYS.rotas).length > 0) {
-          loadRotasFromSb();
         }
         break;
       case 'usuarios':
@@ -4696,10 +4726,17 @@ function genUUID(){
   });
 }
 
+function _signupErr(msg){
+  var err=document.getElementById('su-err');
+  if(err){ err.textContent=msg; err.style.display='block'; }
+}
+function _signupBtnBusy(busy){
+  var btns=document.querySelectorAll('#v-signup .btn-p');
+  if(btns&&btns[0]){ btns[0].disabled=busy; btns[0].textContent=busy?'Criando conta...':'Criar Conta'; }
+}
+
 async function submitSignup(){
-  console.log('[v0-AUDIT] submitSignup() START');
   if(!validateSignupForm()) {
-    console.log('[v0-AUDIT] submitSignup() validation failed');
     return;
   }
   
@@ -4710,74 +4747,77 @@ async function submitSignup(){
   var phone=(document.getElementById('su-phone').value||'').trim();
   var cnpj=(document.getElementById('su-cnpj').value||'').trim();
   
+  // O cadastro EXIGE conexão com o Supabase, pois cria a conta de autenticação real.
+  if(!(CLOUD_ENABLED && _sb && navigator.onLine)){
+    _signupErr('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
+    return;
+  }
+  
+  _signupBtnBusy(true);
+  
   try {
-    // 1. Criar empresa
-    var empresaId=genUUID();
-    var empresas=stor_get(KEYS.empresas)||[];
-    empresas.push({
-      id:empresaId,
-      nome:empresa,
-      cnpj:cnpj||null,
-      telefone:phone||null,
-      criado_em:new Date().toISOString(),
-      ativo:true
-    });
-    stor_set(KEYS.empresas,empresas);
-    console.log('[Fluxy/Signup] Empresa criada:',empresaId);
-    
-    // 2. Hash da senha
-    var pwdHash=await hashPwd(pwd);
-    
-    // 3. Criar usuário admin
-    var userId=genUUID();
-    var users=getUsers()||[];
-    users.push({
-      id:userId,
-      empresaId:empresaId,
-      nome:nome,
-      email:email,
-      pwd:pwdHash,
-      role:'adm',
-      ativo:true,
-      criado_em:new Date().toISOString(),
-      status:'ativo'
-    });
-    saveUsers(users);
-    console.log('[Fluxy/Signup] Usuário admin criado:',userId);
-    
-    // 4. Sincronizar com Supabase se online
-    if(CLOUD_ENABLED && _sb && await isCloudAvailable()){
-      try {
-        // Criar empresa no Supabase
-        var {data:emprData,error:emprErr}=await _sb.from('empresas').insert([{
-          id:empresaId,
-          nome:empresa,
-          cnpj:cnpj||null,
-          criado_em:new Date().toISOString()
-        }]).select().single();
-        
-        if(!emprErr){
-          // Criar usuário no Supabase
-          var {data:userDataErr}=await _sb.from('usuarios').insert([{
-            id:userId,
-            empresa_id:empresaId,
-            nome:nome,
-            email:email,
-            pwd:pwdHash,
-            role:'adm',
-            ativo:true,
-            criado_em:new Date().toISOString()
-          }]).select().single();
-          
-          console.log('[Fluxy/Signup] Sincronizado com Supabase');
-        }
-      } catch(syncErr){
-        console.warn('[Fluxy/Signup] Erro ao sincronizar com Supabase:',syncErr.message);
-        // Continua anyway — dados estão no localStorage
+    // 1. Criar empresa + usuário admin no Supabase via Edge Function (service_role).
+    //    Esta função cria: empresa, conta auth, perfil usuario e o mapeamento auth.
+    var { data: fnData, error: fnError } = await _sb.functions.invoke('criar-empresa', {
+      body: {
+        nome_empresa: empresa,
+        cnpj:         cnpj || null,
+        email_admin:  email,
+        senha_admin:  pwd,
+        nome_admin:   nome,
+        telefone:     phone || null
       }
+    });
+    
+    // Erros retornados pela função (ex.: e-mail/CNPJ já existe) vêm no corpo da resposta
+    if(fnError || (fnData && fnData.error)){
+      var apiMsg = (fnData && fnData.error) || '';
+      var code = (fnData && fnData.code) || '';
+      var friendly = 'Não foi possível criar a conta. Tente novamente.';
+      if(code==='EMAIL_EXISTS') friendly='Este e-mail já está cadastrado no sistema.';
+      else if(code==='CNPJ_EXISTS') friendly='Este CNPJ já está cadastrado no sistema.';
+      else if(code==='INVALID_EMAIL') friendly='E-mail inválido.';
+      else if(code==='PASSWORD_TOO_SHORT') friendly='A senha deve ter no mínimo 6 caracteres.';
+      else if(apiMsg) friendly=apiMsg;
+      console.warn('[Fluxy/Signup] Edge function retornou erro:', code, apiMsg, fnError);
+      _signupErr(friendly);
+      _signupBtnBusy(false);
+      return;
     }
     
-    // 5. Auto-login
+    var empresaId = fnData.empresa_id;
+    var userId    = fnData.usuario_id;
+    console.log('[Fluxy/Signup] Conta criada no Supabase — empresa:', empresaId, '| usuário:', userId);
+    
+    // 2. Autenticar de verdade no Supabase (estabelece sessão → RLS libera leitura/escrita)
+    var { data: authData, error: authError } = await _sb.auth.signInWithPassword({
+      email: email,
+      password: pwd
+    });
+    
+    if(authError || !authData || !authData.session){
+      console.error('[Fluxy/Signup] Conta criada, mas login automático falhou:', authError && authError.message);
+      _signupErr('Conta criada! Faça login com seu e-mail e senha.');
+      _signupBtnBusy(false);
+      backToLogin();
+      return;
+    }
+    console.log('[Fluxy/Signup] Sessão Supabase ativa');
+    
+    // 3. Guardar cópia local (cache offline + fallback de login)
+    var pwdHash=await hashPwd(pwd);
+    var empresas=stor_get(KEYS.empresas)||[];
+    if(!empresas.some(function(e){return e.id===empresaId;})){
+      empresas.push({ id:empresaId, nome:empresa, cnpj:cnpj||null, telefone:phone||null, ativo:true });
+      stor_set(KEYS.empresas,empresas);
+    }
+    var users=getUsers()||[];
+    if(!users.some(function(u){return u.id===userId;})){
+      users.push({ id:userId, empresaId:empresaId, nome:nome, email:email, pwd:pwdHash, role:'adm', ativo:true, status:'ativo' });
+      saveUsers(users);
+    }
+    
+    // 4. Auto-login na sessão local (UI)
     SESS={userId:userId,nome:nome,email:email,role:'adm',empresaId:empresaId,plano:'basico'};
     APP_STATE.session=SESS;
     APP_STATE.set('auth.logged',true);
@@ -4785,19 +4825,16 @@ async function submitSignup(){
     APP_STATE.set('auth.user',nome);
     stor_set(KEYS.sess,SESS);
     
-    // 6. Mostrar app e ir para dashboard
-    console.log('[v0-AUDIT] submitSignup() calling showApp()');
+    // 5. Mostrar app
+    _signupBtnBusy(false);
     showApp();
-    console.log('[v0-AUDIT] submitSignup() showApp() returned, now calling go(dashboard)');
     go('dashboard');
-    console.log('[v0-AUDIT] submitSignup() go(dashboard) returned');
-    
-    console.log('[Fluxy/Signup] ✅ Signup completo. Auto-login e dashboard iniciados.');
+    console.log('[Fluxy/Signup] ✅ Cadastro completo e sincronizado com Supabase.');
     
   } catch(e) {
     console.error('[Fluxy/Signup] Erro fatal:',e);
-    var err=document.getElementById('su-err');
-    if(err){ err.textContent='Erro ao criar conta. Tente novamente.'; err.style.display='block'; }
+    _signupErr('Erro ao criar conta. Verifique sua conexão e tente novamente.');
+    _signupBtnBusy(false);
   }
 }
 
@@ -6754,7 +6791,7 @@ function buildPedCard(p, users, now2, _cobrsCache){
       return b;
     }
 
-    // ── Sempre visíveis (nunca controlados pelo timer) ─────────────
+    // ���─ Sempre visíveis (nunca controlados pelo timer) ─────────────
     bw.appendChild(mkb('👁 Ver','btn-g btn-sm',function(){verPed(pid);}));
     bw.appendChild(mkb('🖨️','btn-g btn-sm',function(){printPed(pid);}));
 
@@ -7512,7 +7549,7 @@ function printPed(id){
     +'*{box-sizing:border-box;margin:0;padding:0}'
     +'body{font-family:Arial,Helvetica,sans-serif;font-size:12px;background:#f1f5f9;color:#111827;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
     +'.wrap{max-width:794px;margin:0 auto;background:#fff;padding:28px 30px 36px}'
-    +'/* ── Table base ── */'
+    +'/* ── Table base ─�� */'
     +'table{width:100%;border-collapse:collapse}'
     +'th{background:#1e293b;color:#f8fafc;padding:9px 10px;font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;text-align:left;white-space:nowrap}'
     +'th.r{text-align:right}'
@@ -7719,7 +7756,7 @@ function notaShareInline(){
 
 // ═══════════════════════════════════════════════════════════
 // ENTREGAS
-// ═══════════════════════════════════════════════════════════
+// ══════════��════════════════════════════════════════════════
 function setEntrTab(tab){
   entrTab=tab;
   var tabs=['pendente','em_rota','entregue','todos'];
@@ -8499,7 +8536,7 @@ function exportRelPDF(){
     +'</tr>';
   }).join('');
 
-  // ── Build pedidos table data ──────────────────────────────────────────────
+  // ── Build pedidos table data ─────��────────────────────────────────────────
   var pedRows=aprovados.slice().sort(function(a,b){return (b._ts||0)-(a._ts||0);}).map(function(p,idx){
     var vn='—'; for(var j=0;j<users.length;j++) if(users[j].id===p.vendId){vn=users[j].nome;break;}
     var bg=idx%2===0?'#ffffff':'#f8fafc';
@@ -10349,7 +10386,7 @@ function delCobr(cobrId){
   openModal(
     '<div class="modal-title">🗑️ Excluir Cobrança</div>'+
     '<div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:var(--r);padding:12px 14px;margin-bottom:14px">'+
-      '<div style="font-family:monospace;font-weight:800;font-size:12px;color:var(--blue);margin-bottom:6px">'+cobr.pedId+' → '+cobr.id+'</div>'+
+      '<div style="font-family:monospace;font-weight:800;font-size:12px;color:var(--blue);margin-bottom:6px">'+cobr.pedId+' �� '+cobr.id+'</div>'+
       '<div class="fw7 t0 mb4">'+sanitize(cobr.cliNome)+'</div>'+
       '<div class="row-between fs12">'+
         '<span style="color:var(--t3)">Valor: </span>'+
@@ -12045,82 +12082,10 @@ async function _rotaFromSb(row){
   };
 }
 
-async function loadRotasFromSb(){
-  // Carrega rotas da empresa no Supabase e popula o cache localStorage
-  if(!CLOUD_ENABLED || !_sb || !SESS) return;
-  try {
-    var { data, error } = await _sb
-      .from('rotas')
-      .select('*')
-      .eq('empresa_id', SESS.empresaId)
-      .order('criado_em', { ascending: false });
-    
-    if(error) {
-      console.log('[Fluxy/ROTA] RLS ou erro ao carregar rotas:', error.message);
-      return;
-    }
-    
-    var rotas = (data || []).map(function(row){ return _rotaFromSb(row); });
-    stor_set(KEYS.rotas, rotas);
-    console.log('[Fluxy/ROTA] '+rotas.length+' rotas carregadas do Supabase');
-  } catch(e) {
-    console.error('[Fluxy/ROTA] Erro ao loadRotasFromSb:', e.message);
-  }
-}
-
-async function _rotaUpsertSb(rotaObj){
-  // Insert ou update de rota no Supabase (async)
-  if(!CLOUD_ENABLED || !_sb || !SESS) return null;
-  var sbObj = _rotaToSb(rotaObj);
-  if(!sbObj) return null;
-  
-  try {
-    // Upsert rota
-    var { data, error } = rotaObj.id && rotaObj.id.startsWith('ROTA')
-      ? await _sb
-          .from('rotas')
-          .update(sbObj)
-          .eq('numero', rotaObj.id)
-          .eq('empresa_id', SESS.empresaId)
-          .select()
-          .single()
-      : await _sb
-          .from('rotas')
-          .insert([{ ...sbObj }])
-          .select()
-          .single();
-    
-    if(error) {
-      console.error('[Fluxy/ROTA] Erro ao upsert rota:', error.message);
-      return null;
-    }
-    console.log('[Fluxy/ROTA] Rota '+rotaObj.id+' salva no Supabase');
-    return data;
-  } catch(e) {
-    console.error('[Fluxy/ROTA] Erro inesperado em _rotaUpsertSb:', e.message);
-    return null;
-  }
-}
-
-async function _rotaDeleteSb(id){
-  // Soft delete (deleted=true) no Supabase
-  if(!CLOUD_ENABLED || !_sb || !SESS || !id) return;
-  try {
-    var { error } = await _sb
-      .from('rotas')
-      .update({ deleted: true })
-      .eq('numero', id)
-      .eq('empresa_id', SESS.empresaId);
-    
-    if(error) {
-      console.error('[Fluxy/ROTA] Erro ao deletar rota:', error.message);
-      return;
-    }
-    console.log('[Fluxy/ROTA] Rota '+id+' marcada como deletada no Supabase');
-  } catch(e) {
-    console.error('[Fluxy/ROTA] Erro inesperado em _rotaDeleteSb:', e.message);
-  }
-}
+// Rotas functions disabled - table doesn't exist in current schema
+// async function loadRotasFromSb(){ }
+// async function _rotaUpsertSb(rotaObj){ }
+// async function _rotaDeleteSb(id){ }
 
 // ── Supabase: Migração Automática de Dados (Etapa 9) ───────────────
 // Migra dados locais para Supabase mantendo cache como contingência
@@ -12779,7 +12744,7 @@ function buildRotaList(peds,clis){
 
 // ════════════════════════════════════════════════════════════════
 // renderRotasMgmt — Rota management UI (ADM/GER)
-// ════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════���════════════════
 var _rotaMgmtSearch='';
 
 function renderRotasMgmt(){
@@ -13622,7 +13587,7 @@ function renderMeusClientes(){
           +'</div>'
         +'</div>'
         +'<div class="row gap4">'
-          +'<button class="btn btn-g btn-xs" data-id="'+cli.id+'" onclick="openCliModal(this.dataset.id)">✏️</button>'
+          +'<button class="btn btn-g btn-xs" data-id="'+cli.id+'" onclick="openCliModal(this.dataset.id)">✏��</button>'
           +'<button class="btn btn-p btn-xs" data-id="'+cli.id+'" onclick="nvParaCli(this.dataset.id)">🛒</button>'
         +'</div>'
       +'</div>'
@@ -13688,24 +13653,21 @@ function seed(){
 var APP_VERSION = '2.1';
 console.log('[APP VERSION]', APP_VERSION, '| build:', new Date().toISOString().slice(0,10));
 
-// ═══ STAGE FINALE: ATIVAR SUPABASE EM PRODUÇÃO ═══
-// Inicializar Supabase com env vars válidas (não hardcoded)
+// ═══ ATIVAR SUPABASE EM PRODUÇÃO ═══
+// Credenciais do projeto correto (anon key é pública por design)
 if(typeof supabase !== 'undefined' && window.location.hostname !== 'localhost') {
-  // URL e KEY do env vars (setadas pelo Supabase integration)
-  var SBURL = 'https://fxxawkgoawtuostlhnzc.supabase.co';
-  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ4eGF3a2dvYXd0dW9zdGxobnpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjU3MTcsImV4cCI6MjA5NjU0MTcxN30.mWFblLMIsuzMLP_SJLRxilfpQOSQcCZk3LEtkkQaofs';
+  var SBURL = 'https://eyyttblikwpdislznuia.supabase.co';
+  var SBKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5eXR0Ymxpa3dwZGlzbHpudWlhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA5NjQ1MDAsImV4cCI6MjA5NjU0MDUwMH0.8i2JiV7IueZn_tw7xfFkl1nyLTHT1Wpa9bN5x7mT07o';
   
   try {
-    window._sb = supabase.createClient(SBURL, SBKEY);
-    console.log('[Fluxy] ✓ Supabase init with valid credentials - URL: ' + SBURL.substring(8,30) + '...');
-    enableCloudSync('supabase', {
-      url: SBURL,
-      key: SBKEY
+    window._sb = supabase.createClient(SBURL, SBKEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
     });
-    console.log('[Fluxy] 🚀 PRODUÇÃO: Supabase ativado com sucesso');
+    console.log('[Fluxy] ✓ Supabase init - projeto:', SBURL.substring(8,30) + '...');
+    enableCloudSync('supabase', { url: SBURL, key: SBKEY });
+    console.log('[Fluxy] 🚀 Supabase ativado');
   } catch(e) {
     console.error('[Fluxy] ✗ Supabase init failed:', e.message);
-    console.error('[Fluxy] Stack:', e.stack);
   }
 }
 
@@ -13844,7 +13806,7 @@ document.addEventListener('DOMContentLoaded',function(){
   }catch(e){}
 });
 
-// ── Installed event ─────────────────────────────────────────────
+// ── Installed event ────────────────────────────────────────��────
 window.addEventListener('appinstalled',function(){
   _pwaPrompt=null;
   var banner=document.getElementById('pwa-banner');
@@ -13853,7 +13815,7 @@ window.addEventListener('appinstalled',function(){
 });
 
 
-// ── Global error guards — prevent silent white screens ──────────────────
+// ── Global error guards — prevent silent white screens ────────��─────────
 window.onerror=function(msg,src,line,col,err){
   console.error('[Fluxy] Uncaught error:',msg,'@',src,line+':'+col,err);
   // If app is showing, don't do anything — go() try/catch handles render errors
