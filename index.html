@@ -577,7 +577,7 @@ td {
 tr:hover td { background:rgba(59,130,246,.05) }
 tr:last-child td { border-bottom:none }
 
-/* ═══════════════════════════════════��═�����═════
+/* ═══════════════════════════════════��═�������═════
    TABS
 ════════════��════════���══��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
@@ -4318,8 +4318,16 @@ function enableCloudSync(provider, config){
   }
   if(config&&config.url&&provider==='supabase'){
     try {
-      window._sb = supabase.createClient(config.url, config.key);
-      console.log('[Fluxy] ✓ Supabase initialized - Cloud sync ready');
+      // Reutiliza o cliente já criado (com persistSession) para evitar
+      // múltiplas instâncias GoTrueClient e corrida na restauração da sessão.
+      if(!window._sb){
+        window._sb = supabase.createClient(config.url, config.key, {
+          auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+        });
+        console.log('[Fluxy] ✓ Supabase initialized - Cloud sync ready');
+      } else {
+        console.log('[Fluxy] ✓ Cloud sync ready (reutilizando cliente Supabase existente)');
+      }
     } catch(e) {
       console.error('[Fluxy] ✗ Supabase init failed:', e.message);
     }
@@ -4571,7 +4579,7 @@ function clearAllTimers(){
 
 
 
-// ════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════��
 // CLEANUP ENGINE — prevent listener / timer / observer leaks
 // ══════════════════════════════════════════���════��═��═��════════════
 var _cleanups={};
@@ -11917,7 +11925,7 @@ function deleteUser(id){
       +'<div class="fw7 t0 mb4">'+target.nome+'</div>'
       +'<div class="fs12 t2">'+target.email+' · '+roleLabel(target.role)+'</div>'
     +'</div>'
-    +'<div class="fs13 t1 mb16">Esta ação é <strong>permanente</strong>. O usuário perderá todo acesso ao sistema e não poderá ser recuperado.</div>'
+    +'<div class="fs13 t1 mb16">Esta ação é <strong>permanente</strong>. O usu��rio perderá todo acesso ao sistema e não poderá ser recuperado.</div>'
     +'<div class="modal-foot">'
       +'<button class="btn btn-g" onclick="closeModal()">Cancelar</button>'
       +'<button class="btn btn-r" data-id="'+id+'" onclick="confirmDeleteUser(this.dataset.id)">🗑 Excluir definitivamente</button>'
@@ -14030,7 +14038,7 @@ window.addEventListener('error', function(e){
   }catch(_){}
 }, true);
 
-// ── Modal leak guard — ensure modal can always be closed ────���────────
+// ── Modal leak guard — ensure modal can always be closed ────���───────��
 document.addEventListener('keydown',function(e){
   if((e.key==='Escape'||e.keyCode===27)&&document.getElementById('modal-bg')&&
      document.getElementById('modal-bg').className==='on'){
