@@ -577,7 +577,7 @@ td {
 tr:hover td { background:rgba(59,130,246,.05) }
 tr:last-child td { border-bottom:none }
 
-/* ═══════════════════════════════════��═���═════
+/* ═══════════════════════════════════��═�����═════
    TABS
 ════════════��════════���══��════�������════════���═���═ */
 .tabs { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:16px }
@@ -2161,6 +2161,7 @@ async function _cobrFromSb(row){
 async function loadCobrFromSb(){
   // Carrega cobranças da empresa no Supabase e popula o cache localStorage
   if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  if(!(await _hasSupabaseSession())){ console.log('[Fluxy/COBR] Sessão Supabase indisponível — mantém cache local'); return; }
   try {
     var { data, error } = await _sb
       .from('cobracas')
@@ -2346,6 +2347,7 @@ async function _usuarioFromSb(row){
 async function loadUsuariosFromSb(){
   // Carrega usuários da empresa no Supabase e popula o cache localStorage
   if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  if(!(await _hasSupabaseSession())){ console.log('[Fluxy/USU] Sessão Supabase indisponível — mantém cache local'); return; }
   try {
     var { data, error } = await _sb
       .from('usuarios')
@@ -2567,6 +2569,7 @@ async function loadPedidosFromSb(){
   // Carrega pedidos da empresa no Supabase e popula o cache localStorage
   // Nota: itens são carregados separadamente via pedido_itens table
   if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  if(!(await _hasSupabaseSession())){ console.log('[Fluxy/PED] Sessão Supabase indisponível — mantém cache local'); return; }
   try {
     var { data, error } = await _sb
       .from('pedidos')
@@ -2683,11 +2686,22 @@ function savePeds(arr){
 // ── Supabase: Synchronization for Clientes (Etapa 3) ───────────────
 // Todas as operações respeitam empresa_id (RLS) e possuem fallback local
 
+async function _hasSupabaseSession(){
+  // Retorna true se há uma sessão Supabase Auth ativa.
+  // getSession() aguarda internamente a inicialização do cliente (restauração do token),
+  // então isto também resolve a corrida entre boot e restauração de sessão.
+  if(!_sb || !_sb.auth) return false;
+  try {
+    var r = await _sb.auth.getSession();
+    return !!(r && r.data && r.data.session);
+  } catch(_){ return false; }
+}
+
 function _cliToSb(cliObj){
   // Converte objeto local (camelCase) → formato Supabase (snake_case + empresa_id)
   if(!cliObj || !SESS) return null;
   var doc = cliObj.cpf || cliObj.cnpj || '';
-  return {
+  var base = {
     empresa_id:   SESS.empresaId,
     nome:         cliObj.nome || '',
     fantasia:     cliObj.fantasia || cliObj.razaoSocial || '',
@@ -2714,6 +2728,9 @@ function _cliToSb(cliObj){
     vend_id:      cliObj.vendId || '',
     whatsapp:     cliObj.whatsapp || ''
   };
+  // Inclui o id apenas quando for UUID válido (idempotência no upsert por PK)
+  if(cliObj.id && isValidUUID(cliObj.id)) base.id = cliObj.id;
+  return base;
 }
 
 function _cliFromSb(row){
@@ -2791,6 +2808,12 @@ async function hydrateAllFromSb(){
 async function loadClisFromSb(){
   // Carrega clientes da empresa no Supabase e popula o cache localStorage
   if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  // Aguarda a sessão Supabase Auth ser restaurada antes de consultar (RLS).
+  // Sem isso, a query pode rodar sem sessão, retornar 0 linhas e apagar o cache local.
+  if(!(await _hasSupabaseSession())){
+    console.log('[Fluxy/CLI] Sessão Supabase indisponível — mantém cache local');
+    return;
+  }
   try {
     var { data, error } = await _sb
       .from('clientes')
@@ -2811,49 +2834,55 @@ async function loadClisFromSb(){
 }
 
 async function _cliUpsertSb(cliObj){
-  // Insert ou update de 1 cliente no Supabase (Etapa 10: com detecção online e fila)
+  // Insert/update de 1 cliente no Supabase via upsert (PK = id uuid). Idempotente.
   if(!CLOUD_ENABLED || !_sb || !SESS) return null;
   
   var sbObj = _cliToSb(cliObj);
   if(!sbObj) return null;
   
+  // O id local precisa ser um UUID válido para casar com a coluna uuid do Supabase.
+  // Se não for, o Supabase gera um id novo automaticamente (uuid_generate_v4).
+  var hasUUID = cliObj.id && isValidUUID(cliObj.id);
+  var record = hasUUID ? { ...sbObj, id: cliObj.id } : { ...sbObj };
+  
   // Se offline → enfileirar com deduplicação
   var isOnline=await isCloudAvailable();
   if(!isOnline){
-    console.log('[Fluxy/CLI] Offline — enfileirando cliente',cliObj.id);
-    _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
+    console.log('[Fluxy/CLI] Offline — enfileirando cliente', cliObj.id);
+    _enqueueOperationDedup('clis','upsert',record);
     return null;
   }
   
   try {
-    var { data, error } = cliObj.id && cliObj.id.length > 20
-      ? await _sb
-          .from('clientes')
-          .update(sbObj)
-          .eq('id', cliObj.id)
-          .eq('empresa_id', SESS.empresaId)
-          .select()
-          .single()
-      : await _sb
-          .from('clientes')
-          .insert([{ ...sbObj, id: cliObj.id }])
-          .select()
-          .single();
+    var { data, error } = await _sb
+      .from('clientes')
+      .upsert([record], { onConflict: 'id' })
+      .select()
+      .single();
     
     if(error) {
-      console.error('[Fluxy/Supabase] Insert/update error:', error.message, error.code);
-      _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
+      console.error('[Fluxy/Supabase] Erro ao salvar cliente:', error.message, error.code);
+      _enqueueOperationDedup('clis','upsert',record);
       return null;
     }
     
-    console.log('[Fluxy/Supabase] ✓ Cliente salvo:', cliObj.id, cliObj.nome);
-    APP_STATE.migration_report.migrada++;
-    stor_set(KEYS.clis, data);
+    console.log('[Fluxy/Supabase] ✓ Cliente salvo:', data && data.id, cliObj.nome);
+    if(APP_STATE.migration_report) APP_STATE.migration_report.migrada++;
+    
+    // Se o Supabase gerou um id novo (cliente sem UUID local), alinhar o cache local
+    if(data && data.id && data.id !== cliObj.id){
+      try {
+        var clisCache = getClis();
+        for(var i=0;i<clisCache.length;i++){
+          if(clisCache[i].id === cliObj.id){ clisCache[i].id = data.id; break; }
+        }
+        saveClis(clisCache);
+      } catch(_){}
+    }
     return data;
   } catch(e) {
     console.error('[Fluxy/CLI] Erro inesperado em _cliUpsertSb:', e.message);
-    // Enfileirar em caso de erro
-    _enqueueOperationDedup('clis',cliObj.id && cliObj.id.length>20?'update':'insert',sbObj);
+    _enqueueOperationDedup('clis','upsert',record);
     return null;
   }
 }
@@ -2954,6 +2983,7 @@ function _prodFromSb(row){
 async function loadProdsFromSb(){
   // Carrega produtos da empresa no Supabase e popula o cache localStorage
   if(!CLOUD_ENABLED || !_sb || !SESS) return;
+  if(!(await _hasSupabaseSession())){ console.log('[Fluxy/PROD] Sessão Supabase indisponível — mantém cache local'); return; }
   try {
     var { data, error } = await _sb
       .from('produtos')
@@ -4543,7 +4573,7 @@ function clearAllTimers(){
 
 // ════════════════════════════════════════════════════════════════
 // CLEANUP ENGINE — prevent listener / timer / observer leaks
-// ══════════════════════════════════════════���════��═══��════════════
+// ══════════════════════════════════════════���════��═��═��════════════
 var _cleanups={};
 function registerCleanup(viewId, fn){
   if(!_cleanups[viewId]) _cleanups[viewId]=[];
@@ -4578,7 +4608,7 @@ function busyLock(key){
 }
 function busyUnlock(key){ delete _busyOps[key]; }
 
-// ── Input sanitizer ────────────────────────────────────────────────────────
+// ── Input sanitizer ───────────────────────────────────��────────────────────
 function sanitize(v){
   if(v==null) return '';
   return String(v)
@@ -5898,7 +5928,7 @@ function saveCli(editId){
       }
     }
   } else {
-    obj.id=uid();
+    obj.id=(typeof genUUID==='function'?genUUID():uid());
     obj.vendId=isVend()?SESS.userId:null;
     obj.criadoEm=new Date().toISOString();
     clis.push(obj);
@@ -12102,7 +12132,6 @@ async function migrateDataToSb(){
     { key: 'prods', table: 'produtos', name: 'Produtos', converter: _prodToSb },
     { key: 'peds', table: 'pedidos', name: 'Pedidos', converter: _pedidoToSb },
     { key: 'cobr', table: 'cobracas', name: 'Cobranças', converter: _cobrToSb },
-    { key: 'rotas', table: 'rotas', name: 'Rotas', converter: _rotaToSb },
     { key: 'usuarios', table: 'usuarios', name: 'Usuários', converter: _usuarioToSb }
   ];
   
@@ -12159,7 +12188,7 @@ async function _migrateModulo(key, table, name, converter){
       var batch = sbRecords.slice(b, b+BATCH_SIZE);
       var { data, error } = await _sb
         .from(table)
-        .upsert(batch, { onConflict: 'id,empresa_id' });
+        .upsert(batch, { onConflict: 'id' });
       
       if(error){
         throw new Error(table+': '+error.message);
@@ -12328,7 +12357,7 @@ async function _flushQueue(){
           var {error}=await _sb.from(table).delete().eq('id',op.data.id);
           if(error) throw error;
         }else{
-          var {error}=await _sb.from(table).upsert([op.data],{onConflict:'id,empresa_id'});
+          var {error}=await _sb.from(table).upsert([op.data],{onConflict:'id'});
           if(error) throw error;
         }
         
@@ -12948,7 +12977,7 @@ function renderRotas(){
         statusBtns='<button class="btn btn-y btn-sm" data-id="'+p.id+'" data-st="em_rota" onclick="enSetStatus(this.dataset.id,this.dataset.st);renderRotas()">🚚 Saiu</button>';
       if(es==='em_rota')
         statusBtns='<button class="btn btn-g btn-sm" data-id="'+p.id+'" data-st="pendente" onclick="enSetStatus(this.dataset.id,this.dataset.st);renderRotas()">← Voltar</button>'
-          +'<button class="btn btn-gr btn-sm" data-id="'+p.id+'" data-st="entregue" onclick="enSetStatus(this.dataset.id,this.dataset.st);renderRotas()">✅ Entregue</button>';
+          +'<button class="btn btn-gr btn-sm" data-id="'+p.id+'" data-st="entregue" onclick="enSetStatus(this.dataset.id,this.dataset.st);renderRotas()">��� Entregue</button>';
       if(es==='entregue')
         statusBtns='<button class="btn btn-g btn-xs" data-id="'+p.id+'" data-st="pendente" onclick="enSetStatus(this.dataset.id,this.dataset.st);renderRotas()">↩</button>';
     }
