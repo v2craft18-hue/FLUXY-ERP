@@ -1,10 +1,11 @@
 // ══════════════════════════════════════════════════════════════════
-// Fluxy ERP — Service Worker v1.2
-// Strategy: Cache-first for app shell, Network-first for API calls
+// Fluxy ERP — Service Worker v1.3
+// Strategy: Network-first for index.html (always latest app code),
+//           cache fallback only when offline.
 // Single-file architecture: index.html contains all CSS + JS inline
 // ══════════════════════════════════════════════════════════════════
 
-var CACHE_VERSION    = '1.2';
+var CACHE_VERSION    = '1.3';
 var CACHE_NAME       = 'fluxy-v' + CACHE_VERSION;
 var CACHE_OLD_PREFIX = 'fluxy-v';
 
@@ -41,7 +42,7 @@ self.addEventListener('activate', function(e){
   );
 });
 
-// ── Fetch: cache-first for shell, network-first for others ────────
+// ── Fetch: network-first for app code, cache fallback offline ─────
 self.addEventListener('fetch', function(e){
   var url = e.request.url;
 
@@ -49,39 +50,48 @@ self.addEventListener('fetch', function(e){
   if(e.request.method !== 'GET') return;
   if(!url.startsWith(self.location.origin)) return;
 
-  // Network-first for manifest.json (always fresh metadata)
-  if(url.includes('manifest.json')){
+  // Never intercept API/auth calls (Supabase etc. são cross-origin,
+  // mas garantimos que qualquer rota dinâmica vá sempre à rede)
+  if(url.includes('/functions/') || url.includes('/auth/') || url.includes('/rest/')){
+    return; // deixa o navegador buscar direto da rede
+  }
+
+  var isNavigation = (e.request.mode === 'navigate');
+  var isAppShell = isNavigation ||
+                   url.endsWith('/') ||
+                   url.includes('index.html') ||
+                   url.includes('sw.js') ||
+                   url.includes('manifest.json');
+
+  if(isAppShell){
+    // NETWORK-FIRST: sempre tenta a versão mais recente; cache só offline.
     e.respondWith(
-      fetch(e.request).catch(function(){
-        return caches.match(e.request);
+      fetch(e.request).then(function(response){
+        if(response && response.status === 200){
+          var copy = response.clone();
+          caches.open(CACHE_NAME).then(function(cache){ cache.put(e.request, copy); });
+        }
+        return response;
+      }).catch(function(){
+        return caches.match(e.request).then(function(cached){
+          return cached || caches.match('./index.html');
+        });
       })
     );
     return;
   }
 
-  // Cache-first for index.html and sw.js (app shell)
+  // Demais assets: cache-first com atualização em segundo plano
   e.respondWith(
     caches.match(e.request).then(function(cached){
-      if(cached){
-        // Stale-while-revalidate: serve cache, update in background
-        var fetchUpdate = fetch(e.request).then(function(response){
-          if(response && response.status === 200){
-            caches.open(CACHE_NAME).then(function(cache){
-              cache.put(e.request, response.clone());
-            });
-          }
-          return response;
-        }).catch(function(){});
-        return cached;
-      }
-      return fetch(e.request).then(function(response){
+      var network = fetch(e.request).then(function(response){
         if(response && response.status === 200){
-          caches.open(CACHE_NAME).then(function(cache){
-            cache.put(e.request, response.clone());
-          });
+          var copy = response.clone();
+          caches.open(CACHE_NAME).then(function(cache){ cache.put(e.request, copy); });
         }
         return response;
-      });
+      }).catch(function(){ return cached; });
+      return cached || network;
     })
   );
 });
